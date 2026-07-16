@@ -17,6 +17,7 @@ import {
   Info,
   ShieldAlert,
   Bot,
+  Activity,
 } from "lucide-react";
 
 import { PortfolioData, TradePosition, NewsArticle, MacroEvent, MLModel, NotificationSettings, NotificationLog, Candlestick, BacktestParams, LlmSettings } from "./types";
@@ -31,8 +32,11 @@ import { CorrelationMatrix } from "./components/CorrelationMatrix";
 import { CryptoTicker } from "./components/CryptoTicker";
 
 
+import { LiveTradingPanel } from "./components/live_trading/LiveTradingPanel";
+
+
 export default function App() {
-  const [activeTab, setActiveTab] = useState<"TRADING" | "NEWS" | "BACKTEST" | "ML" | "AI_BOT" | "SETTINGS">("TRADING");
+  const [activeTab, setActiveTab] = useState<"TRADING" | "NEWS" | "BACKTEST" | "ML" | "AI_BOT" | "SETTINGS" | "LIVE">("TRADING");
 
   // Market & Candlestick Feed States
   const [selectedCoin, setSelectedCoin] = useState("BTCUSDT");
@@ -461,6 +465,14 @@ export default function App() {
               }`}
             >
               <Sliders className="h-3.5 w-3.5" /> Pengaturan AI & Notif
+            </button>
+            <button
+              onClick={() => setActiveTab("LIVE")}
+              className={`flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg text-xs font-bold transition font-sans cursor-pointer ${
+                activeTab === "LIVE" ? "bg-slate-900 text-amber-500 border border-slate-850/80 shadow-md shadow-amber-500/5" : "text-slate-500 hover:text-slate-300"
+              }`}
+            >
+              <Activity className="h-3.5 w-3.5 text-amber-500" /> LIVE TRADING
             </button>
           </div>
 
@@ -933,6 +945,13 @@ export default function App() {
             onTriggerTest={handleTriggerTestAlert}
             llmSettings={llmSettings}
             onSaveLlmSettings={handleSaveLlmSettings}
+          />
+        )}
+
+        {activeTab === "LIVE" && (
+          <LiveTradingPanel
+            lang="ID"
+            selectedCoin={selectedCoin}
           />
         )}
         </ErrorBoundary>

@@ -627,6 +627,10 @@ app.add_middleware(
 # Register Sentix UI compatibility adapter routes (takes priority)
 from backend.sentix_adapter import router as sentix_router
 app.include_router(sentix_router)
+
+# Register Live Trading router
+from backend.live_trading.endpoints import router as live_trading_router
+app.include_router(live_trading_router)
 # Pydantic Models
 class TriggerCrisisRequest(BaseModel):
     type: str
