@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useRef } from "react";
-import { TrendingUp, TrendingDown, RefreshCw, Activity, ArrowUpRight, ArrowDownRight } from "lucide-react";
+import { TrendingUp, TrendingDown, RefreshCw, Activity, ArrowUpRight, ArrowDownRight, Compass } from "lucide-react";
 
 interface Asset {
   symbol: string;
@@ -21,7 +21,20 @@ export function CryptoTicker({ onSelectCoin, selectedCoin }: CryptoTickerProps) 
   const [lastUpdated, setLastUpdated] = useState<string>("");
   const [prevPrices, setPrevPrices] = useState<{ [symbol: string]: number }>({});
   const [priceFlash, setPriceFlash] = useState<{ [symbol: string]: "up" | "down" | null }>({});
+  const [fng, setFng] = useState<{ value: string; value_classification: string } | null>(null);
   const flashTimeouts = useRef<{ [symbol: string]: NodeJS.Timeout }>({});
+
+  const fetchFngData = async () => {
+    try {
+      const res = await fetch("/api/fear-and-greed");
+      if (res.ok) {
+        const data = await res.json();
+        setFng(data);
+      }
+    } catch (e) {
+      console.error("Gagal mengambil data Fear & Greed untuk ticker:", e);
+    }
+  };
 
   const fetchMarketData = async () => {
     try {
@@ -80,9 +93,12 @@ export function CryptoTicker({ onSelectCoin, selectedCoin }: CryptoTickerProps) 
 
   useEffect(() => {
     fetchMarketData();
+    fetchFngData();
     const interval = setInterval(fetchMarketData, 4000);
+    const fngInterval = setInterval(fetchFngData, 20000);
     return () => {
       clearInterval(interval);
+      clearInterval(fngInterval);
       // Clean up any pending timeouts
       Object.values(flashTimeouts.current).forEach(clearTimeout);
     };
@@ -110,27 +126,86 @@ export function CryptoTicker({ onSelectCoin, selectedCoin }: CryptoTickerProps) 
     }
   };
 
+  const getFngStyles = (classification: string) => {
+    const norm = (classification || "neutral").trim().toLowerCase();
+    if (norm.includes("extreme fear")) {
+      return {
+        textClass: "text-red-500",
+        bgClass: "bg-red-950/20",
+        borderClass: "border-red-500/20",
+        label: "Extreme Fear",
+      };
+    }
+    if (norm.includes("extreme greed")) {
+      return {
+        textClass: "text-emerald-400",
+        bgClass: "bg-emerald-950/20",
+        borderClass: "border-emerald-400/20",
+        label: "Extreme Greed",
+      };
+    }
+    if (norm.includes("fear")) {
+      return {
+        textClass: "text-orange-500",
+        bgClass: "bg-orange-950/20",
+        borderClass: "border-orange-500/20",
+        label: "Fear",
+      };
+    }
+    if (norm.includes("greed")) {
+      return {
+        textClass: "text-lime-400",
+        bgClass: "bg-lime-950/20",
+        borderClass: "border-lime-400/20",
+        label: "Greed",
+      };
+    }
+    return {
+      textClass: "text-yellow-500",
+      bgClass: "bg-yellow-950/20",
+      borderClass: "border-yellow-500/20",
+      label: "Neutral",
+    };
+  };
+
   const formatPrice = (price: number, symbol: string) => {
     if (symbol === "XRP") return price.toFixed(4);
     if (symbol === "DXY") return price.toFixed(2); // index points
     return price.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
   };
 
+  const sentimentStyles = getFngStyles(fng ? fng.value_classification : "neutral");
+
   return (
     <div className="bg-slate-950/80 border-b border-slate-900 px-6 py-3 flex flex-wrap items-center justify-between gap-4 backdrop-blur-md">
       {/* Label and Live Status */}
-      <div className="flex items-center gap-2">
-        <span className="relative flex h-2 w-2">
-          <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
-          <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
-        </span>
-        <span className="text-[11px] font-bold tracking-wider text-slate-400 uppercase font-sans">
-          Live Market Ticker
-        </span>
-        {lastUpdated && (
-          <span className="text-[9px] font-mono text-slate-600 hidden sm:inline">
-            (Sinc: {lastUpdated})
+      <div className="flex items-center gap-3 flex-wrap">
+        <div className="flex items-center gap-2">
+          <span className="relative flex h-2 w-2">
+            <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+            <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
           </span>
+          <span className="text-[11px] font-bold tracking-wider text-slate-400 uppercase font-sans">
+            Live Market Ticker
+          </span>
+          {lastUpdated && (
+            <span className="text-[9px] font-mono text-slate-600 hidden sm:inline">
+              (Sinc: {lastUpdated})
+            </span>
+          )}
+        </div>
+
+        {/* Fear & Greed Index Badge */}
+        {fng && (
+          <div className={`flex items-center gap-2 px-2.5 py-1 rounded-xl border font-mono ${sentimentStyles.bgClass} ${sentimentStyles.borderClass} shrink-0`}>
+            <Compass className={`h-3.5 w-3.5 ${sentimentStyles.textClass} animate-spin-slow`} style={{ animationDuration: "8s" }} />
+            <div className="flex flex-col">
+              <span className="text-[7.5px] text-slate-500 uppercase font-sans font-bold leading-none">FEAR & GREED</span>
+              <span className={`text-[10px] font-black uppercase tracking-wider ${sentimentStyles.textClass} leading-tight`}>
+                {fng.value} - {sentimentStyles.label}
+              </span>
+            </div>
+          </div>
         )}
       </div>
 
