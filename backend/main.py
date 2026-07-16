@@ -141,6 +141,12 @@ async def trigger_automated_trade_sim(item: Dict[str, Any], config: Dict[str, An
         confidence = trade_decision.get("confidence", 0)
         threshold = bot_settings.get("minConfidence", config.get("confidenceThreshold", 75))
         
+        strategy = bot_settings.get("strategy", "CONSERVATIVE").upper()
+        
+        # Decide if we check Veto Gate based on strategy
+        bypass_veto = strategy in ["AGGRESSIVE", "SCALPING", "HEDGING"]
+        veto_active = False if bypass_veto else veto_gate.get("vetoActive", False)
+
         # --- Bridge to Sentix Compatibility Adapter (AI Bot activity console) ---
         try:
             from backend.sentix_adapter import sentix_state, _save_sentix_db
@@ -161,7 +167,7 @@ async def trigger_automated_trade_sim(item: Dict[str, Any], config: Dict[str, An
                 "symbol": f"{target_asset}USDT",
                 "price": live_price,
                 "confidence": confidence,
-                "message": f"🤖 [AI BOT Auto]: Menganalisis {target_asset} @ ${live_price:,.2f}. Keputusan: {decision} ({confidence}%). Alasan: {trade_decision.get('strategyReasoning', '')}"
+                "message": f"🤖 [AI BOT Auto ({strategy})]: Menganalisis {target_asset} @ ${live_price:,.2f}. Keputusan: {decision} ({confidence}%). Alasan: {trade_decision.get('strategyReasoning', '')}"
             }
             
             if "aiBotLogs" not in sentix_state:
@@ -170,107 +176,187 @@ async def trigger_automated_trade_sim(item: Dict[str, Any], config: Dict[str, An
             sentix_state["aiBotLogs"] = sentix_state["aiBotLogs"][:100]
             
             # If decision is LONG or SHORT and confidence >= threshold, place trade in sentix_state
-            if decision in ["LONG", "SHORT"] and not veto_gate.get("vetoActive", False) and confidence >= threshold:
+            if decision in ["LONG", "SHORT"] and not veto_active and confidence >= threshold:
                 symbol_usdt = f"{target_asset}USDT"
-                if not any(t.get("status") == "OPEN" and t.get("symbol") == symbol_usdt for t in sentix_state["trades"]):
-                    lev_val = 5
-                    try:
-                        lev_val = int(trade_decision.get("recommendedLeverage", "5x").replace("x", ""))
-                    except Exception:
-                        pass
+                
+                # Standard default parameters
+                lev_val = 5
+                try:
+                    lev_val = int(trade_decision.get("recommendedLeverage", "5x").replace("x", ""))
+                except Exception:
+                    pass
                     
-                    margin = 1000.0
-                    qty = (margin * lev_val) / live_price
-                    
-                    sl_str = trade_decision.get("recommendedStopLoss", "2.5%").replace("%", "")
-                    try:
-                        sl_pct = float(sl_str)
-                    except ValueError:
-                        sl_pct = 2.5
-                    tp_pct = sl_pct * 2.0
-                    
-                    sl_price = live_price * (1 - sl_pct / 100) if decision == "LONG" else live_price * (1 + sl_pct / 100)
-                    tp_price = live_price * (1 + tp_pct / 100) if decision == "LONG" else live_price * (1 - tp_pct / 100)
-                    
+                sl_str = trade_decision.get("recommendedStopLoss", "2.5%").replace("%", "")
+                try:
+                    sl_pct = float(sl_str)
+                except ValueError:
+                    sl_pct = 2.5
+                tp_pct = sl_pct * 2.0
+
+                # Override params based on strategy
+                if strategy == "SCALPING":
+                    lev_val = 20
+                    sl_pct = 0.8
+                    tp_pct = 1.5
+                elif strategy == "SWING":
+                    lev_val = 3
+                    sl_pct = 4.0
+                    tp_pct = 10.0
+
+                # Determine Margin/Allocation and apply Martingale doubling if last closed trade was a loss
+                margin = float(bot_settings.get("allocationPerTrade", 1000.0))
+                if strategy == "MARTINGALE":
+                    closed_trades = [t for t in sentix_state.get("trades", []) if t.get("status") == "CLOSED"]
+                    if closed_trades:
+                        closed_trades.sort(key=lambda x: x.get("closeTime", 0) or x.get("exitTimestamp", 0) or 0, reverse=True)
+                        last_trade = closed_trades[0]
+                        last_pnl = last_trade.get("pnl", 0.0) or 0.0
+                        if last_pnl < 0.0:
+                            margin = margin * 2.0
+                            log_entry["message"] += f" [Martingale Double Active: ${margin}]"
+                            print(f"[Martingale Strategy] Last trade was a loss (PnL: {last_pnl}%). Doubling allocation to ${margin}")
+
+                # Helper function to place a single trade object
+                def add_sentix_trade(trade_type, sl_val, tp_val, active_margin):
+                    qty = (active_margin * lev_val) / live_price
                     trade_obj = {
-                        "id": f"trade-bot-{int(time.time() * 1000)}",
+                        "id": f"trade-bot-{trade_type.lower()}-{int(time.time() * 1000)}",
                         "symbol": symbol_usdt,
-                        "type": "BUY" if decision == "LONG" else "SELL",
+                        "type": trade_type,
                         "size": round(qty, 6),
                         "leverage": lev_val,
                         "entryPrice": live_price,
                         "exitPrice": None,
                         "pnl": None,
-                        "sl": round(sl_price, 2),
-                        "tp": round(tp_price, 2),
+                        "sl": round(sl_val, 2),
+                        "tp": round(tp_val, 2),
                         "trailingStopPct": None,
                         "status": "OPEN",
                         "timestamp": int(time.time() * 1000),
                         "exitTimestamp": None,
-                        "reason": "AI_BOT"
+                        "reason": f"AI_BOT_{strategy}"
                     }
-                    
                     if "trades" not in sentix_state:
                         sentix_state["trades"] = []
                     sentix_state["trades"].append(trade_obj)
-                    sentix_state["portfolio"]["balanceUSD"] = round(sentix_state["portfolio"]["balanceUSD"] - margin, 2)
+                    sentix_state["portfolio"]["balanceUSD"] = round(sentix_state["portfolio"]["balanceUSD"] - active_margin, 2)
+                    print(f"[Sim Trading] Placed {strategy} trade: {trade_type} {symbol_usdt} at ${live_price}")
+
+                if strategy == "HEDGING":
+                    has_long = any(t.get("status") == "OPEN" and t.get("symbol") == symbol_usdt and t.get("type") == "BUY" for t in sentix_state["trades"])
+                    has_short = any(t.get("status") == "OPEN" and t.get("symbol") == symbol_usdt and t.get("type") == "SELL" for t in sentix_state["trades"])
+                    
+                    # Hedging SL/TP overrides (medium-tight to capture breakout moves)
+                    h_sl_pct = 1.5
+                    h_tp_pct = 3.0
+                    long_sl = live_price * (1 - h_sl_pct / 100)
+                    long_tp = live_price * (1 + h_tp_pct / 100)
+                    short_sl = live_price * (1 + h_sl_pct / 100)
+                    short_tp = live_price * (1 - h_tp_pct / 100)
+                    
+                    if not has_long:
+                        add_sentix_trade("BUY", long_sl, long_tp, margin)
+                    if not has_short:
+                        add_sentix_trade("SELL", short_sl, short_tp, margin)
+                else:
+                    if not any(t.get("status") == "OPEN" and t.get("symbol") == symbol_usdt for t in sentix_state["trades"]):
+                        trade_type = "BUY" if decision == "LONG" else "SELL"
+                        sl_price = live_price * (1 - sl_pct / 100) if decision == "LONG" else live_price * (1 + sl_pct / 100)
+                        tp_price = live_price * (1 + tp_pct / 100) if decision == "LONG" else live_price * (1 - tp_pct / 100)
+                        add_sentix_trade(trade_type, sl_price, tp_price, margin)
             
             _save_sentix_db()
         except Exception as e:
             print(f"[Sim Trading] Failed to bridge log/trade to Sentix adapter: {e}")
             
         # Check if trade is valid and not vetoed
-        if decision in ["LONG", "SHORT"] and not veto_gate.get("vetoActive", False):
+        if decision in ["LONG", "SHORT"] and not veto_active:
             if confidence >= threshold:
                 async with db_lock:
                     db = read_database()
-                    # Prevent duplicate open positions on same asset to keep risk managed
                     existing_trades = db.get("savedTrades", [])
-                    if any(t.get("status") == "OPEN" and t.get("targetAsset") == target_asset and t.get("type") == "SIMULATED" for t in existing_trades):
-                        print(f"[Sim Trading] Already have an open simulated position on {target_asset}. Skipping.")
-                        return
-
-                # Place simulated trade
+                    
                 cur_price = get_asset_current_price(target_asset)
                 if cur_price > 0.0:
+                    
+                    # Standard default parameters (again for db sync)
+                    lev_val = 5
+                    try:
+                        lev_val = int(trade_decision.get("recommendedLeverage", "5x").replace("x", ""))
+                    except Exception:
+                        pass
+                        
                     sl_str = trade_decision.get("recommendedStopLoss", "2.5%").replace("%", "")
                     try:
                         sl_pct = float(sl_str)
                     except ValueError:
                         sl_pct = 2.5
-                        
                     tp_pct = sl_pct * 2.0
-                    
-                    # Store simulated trade
-                    sim_trade = {
-                        "id": f"trade-{int(time.time() * 1000)}",
-                        "timestamp": int(time.time() * 1000),
-                        "decision": decision,
-                        "targetAsset": target_asset,
-                        "confidence": confidence,
-                        "recommendedLeverage": trade_decision.get("recommendedLeverage", "5x"),
-                        "recommendedStopLoss": f"{sl_pct}%",
-                        "recommendedTakeProfit": f"{tp_pct}%",
-                        "strategyReasoning": trade_decision.get("strategyReasoning", ""),
-                        "status": "OPEN",
-                        "entryPrice": cur_price,
-                        "currentPrice": cur_price,
-                        "exitPrice": None,
-                        "closeTime": None,
-                        "closeReason": None,
-                        "pnl": 0.0,
-                        "headline": headline,
-                        "type": "SIMULATED"
-                    }
-                    
-                    async with db_lock:
-                        db = read_database()
-                        if "savedTrades" not in db:
-                            db["savedTrades"] = []
+
+                    if strategy == "SCALPING":
+                        lev_val = 20
+                        sl_pct = 0.8
+                        tp_pct = 1.5
+                    elif strategy == "SWING":
+                        lev_val = 3
+                        sl_pct = 4.0
+                        tp_pct = 10.0
+
+                    def add_db_trade(trade_dec, sl_val, tp_val):
+                        sim_trade = {
+                            "id": f"trade-{trade_dec.lower()}-{int(time.time() * 1000)}",
+                            "timestamp": int(time.time() * 1000),
+                            "decision": trade_dec,
+                            "targetAsset": target_asset,
+                            "confidence": confidence,
+                            "recommendedLeverage": f"{lev_val}x",
+                            "recommendedStopLoss": f"{sl_pct}%",
+                            "recommendedTakeProfit": f"{tp_pct}%",
+                            "strategyReasoning": f"[{strategy} Strategy] {trade_decision.get('strategyReasoning', '')}",
+                            "status": "OPEN",
+                            "entryPrice": cur_price,
+                            "currentPrice": cur_price,
+                            "exitPrice": None,
+                            "closeTime": None,
+                            "closeReason": None,
+                            "pnl": 0.0,
+                            "headline": headline,
+                            "type": "SIMULATED"
+                        }
+                        
+                        if strategy == "HEDGING":
+                            sim_trade["recommendedStopLoss"] = "1.5%"
+                            sim_trade["recommendedTakeProfit"] = "3.0%"
+                            sim_trade["strategyReasoning"] = f"[HEDGING Strategy] Dual directional entry. {trade_decision.get('strategyReasoning', '')}"
+                        
                         db["savedTrades"].insert(0, sim_trade)
                         db["savedTrades"] = db["savedTrades"][:100]
-                        write_database(db)
+
+                    if strategy == "HEDGING":
+                        has_long_db = any(t.get("status") == "OPEN" and t.get("targetAsset") == target_asset and t.get("decision") == "LONG" and t.get("type") == "SIMULATED" for t in existing_trades)
+                        has_short_db = any(t.get("status") == "OPEN" and t.get("targetAsset") == target_asset and t.get("decision") == "SHORT" and t.get("type") == "SIMULATED" for t in existing_trades)
                         
+                        async with db_lock:
+                            db = read_database()
+                            if "savedTrades" not in db:
+                                db["savedTrades"] = []
+                            if not has_long_db:
+                                add_db_trade("LONG", cur_price * 0.985, cur_price * 1.03)
+                            if not has_short_db:
+                                add_db_trade("SHORT", cur_price * 1.015, cur_price * 0.97)
+                            write_database(db)
+                    else:
+                        has_existing_db = any(t.get("status") == "OPEN" and t.get("targetAsset") == target_asset and t.get("type") == "SIMULATED" for t in existing_trades)
+                        if not has_existing_db:
+                            sl_price = cur_price * (1 - sl_pct / 100) if decision == "LONG" else cur_price * (1 + sl_pct / 100)
+                            tp_price = cur_price * (1 + tp_pct / 100) if decision == "LONG" else cur_price * (1 - tp_pct / 100)
+                            async with db_lock:
+                                db = read_database()
+                                if "savedTrades" not in db:
+                                    db["savedTrades"] = []
+                                add_db_trade(decision, sl_price, tp_price)
+                                write_database(db)
+                                
                     print(f"[Sim Trading] Successfully opened automated trade: {decision} {target_asset} at {cur_price}")
                     
                     # Send telegram alert
