@@ -1,0 +1,76 @@
+{
+    "CPI": {
+        "BTC": {
+            "mean": -0.1351,
+            "median": -0.0551,
+            "std": 0.4133,
+            "win_rate": 30.0,
+            "n": 10
+        },
+        "ETH": {
+            "mean": -0.1668,
+            "median": -0.0789,
+            "std": 0.4327,
+            "win_rate": 30.0,
+            "n": 10
+        },
+        "SOL": {
+            "mean": 0.0266,
+            "median": 0.115,
+            "std": 0.2562,
+            "win_rate": 20.0,
+            "n": 10
+        }
+    },
+    "NFP": {
+        "BTC": {
+            "mean": -0.0653,
+            "median": -0.089,
+            "std": 0.3549,
+            "win_rate": 23.53,
+            "n": 17
+        },
+        "ETH": {
+            "mean": -0.0216,
+            "median": -0.0812,
+            "std": 0.3965,
+            "win_rate": 29.41,
+            "n": 17
+        },
+        "SOL": {
+            "mean": -0.001,
+            "median": -0.2073,
+            "std": 0.7156,
+            "win_rate": 47.06,
+            "n": 17
+        }
+    },
+    "GEOPOLITICS": {
+        "BTC": {
+            "mean": 0.0275,
+            "median": 0.0,
+            "std": 0.24,
+            "win_rate": 5.13,
+            "n": 78
+        },
+        "ETH": {
+            "mean": 0.0107,
+            "median": -0.0133,
+            "std": 0.3191,
+            "win_rate": 11.54,
+            "n": 78
+        },
+        "SOL": {
+            "mean": 0.0429,
+            "median": 0.0286,
+            "std": 0.3585,
+            "win_rate": 17.95,
+            "n": 78
+        }
+    },
+    "metadata": {
+        "verified_at": "2026-07-10T13:25:00Z",
+        "source_data": "Train-data/ BTC_USDT_futures_1m & backend/database.db",
+        "note": "XAU (Gold) was not validated due to lack of high-res 5m historical data."
+    }
+}

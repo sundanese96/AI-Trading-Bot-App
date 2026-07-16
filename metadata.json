@@ -1,0 +1,6 @@
+{
+  "name": "KriptoSakti Crypto Simulator",
+  "description": "Industrial-grade cryptocurrency trading simulation app featuring real-time Binance candle streaming, automated risk management (SL/TP), historical backtesting, actual full-content news scraping with deep Gemini-based sentiment analysis, local ML model training simulation, and active Telegram/Email notifications.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

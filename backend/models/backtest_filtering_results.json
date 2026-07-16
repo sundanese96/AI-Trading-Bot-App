@@ -1,0 +1,281 @@
+{
+  "xgboost": [
+    {
+      "Confidence": "No Filter",
+      "Total Signals": 181549,
+      "UP Precision": 29.766771455907755,
+      "DOWN Precision": 27.5670327495795,
+      "Dir Precision": 28.542156662939483,
+      "RegA Trades": 181549,
+      "RegA Win Rate": 28.542156662939483,
+      "RegA P&L (%)": -11978.229999983056,
+      "RegB Trades": 30572,
+      "RegB Win Rate": 23.8878712547429,
+      "RegB P&L (%)": -2122.0901513781987
+    },
+    {
+      "Confidence": ">= 0.50",
+      "Total Signals": 10569,
+      "UP Precision": 41.07846649946256,
+      "DOWN Precision": 35.632644876679365,
+      "Dir Precision": 38.508846626927806,
+      "RegA Trades": 10569,
+      "RegA Win Rate": 38.508846626927806,
+      "RegA P&L (%)": -614.880000000061,
+      "RegB Trades": 1298,
+      "RegB Win Rate": 52.85053929121726,
+      "RegB P&L (%)": -95.29292701395491
+    },
+    {
+      "Confidence": ">= 0.60",
+      "Total Signals": 221,
+      "UP Precision": 47.14285714285714,
+      "DOWN Precision": 63.63636363636363,
+      "Dir Precision": 47.963800904977376,
+      "RegA Trades": 221,
+      "RegA Win Rate": 47.963800904977376,
+      "RegA P&L (%)": -12.92000000000001,
+      "RegB Trades": 35,
+      "RegB Win Rate": 45.714285714285715,
+      "RegB P&L (%)": -20.546607449008842
+    },
+    {
+      "Confidence": ">= 0.70",
+      "Total Signals": 10,
+      "UP Precision": 60.0,
+      "DOWN Precision": 0.0,
+      "Dir Precision": 60.0,
+      "RegA Trades": 10,
+      "RegA Win Rate": 60.0,
+      "RegA P&L (%)": -0.2500000000000002,
+      "RegB Trades": 2,
+      "RegB Win Rate": 100.0,
+      "RegB P&L (%)": 18.02761988497069
+    },
+    {
+      "Confidence": ">= 0.75",
+      "Total Signals": 0,
+      "UP Precision": 0.0,
+      "DOWN Precision": 0.0,
+      "Dir Precision": 0.0,
+      "RegA Trades": 0,
+      "RegA Win Rate": 0.0,
+      "RegA P&L (%)": 0.0,
+      "RegB Trades": 0,
+      "RegB Win Rate": 0.0,
+      "RegB P&L (%)": 0.0
+    }
+  ],
+  "lightgbm": [
+    {
+      "Confidence": "No Filter",
+      "Total Signals": 174095,
+      "UP Precision": 29.900235454037915,
+      "DOWN Precision": 28.33993086225886,
+      "Dir Precision": 29.078376748327063,
+      "RegA Trades": 174095,
+      "RegA Win Rate": 29.078376748327063,
+      "RegA P&L (%)": -11402.449999985285,
+      "RegB Trades": 24453,
+      "RegB Win Rate": 25.35476219686746,
+      "RegB P&L (%)": -1694.82615857772
+    },
+    {
+      "Confidence": ">= 0.50",
+      "Total Signals": 5571,
+      "UP Precision": 42.68613138686131,
+      "DOWN Precision": 42.124883504193846,
+      "Dir Precision": 42.46993358463472,
+      "RegA Trades": 5571,
+      "RegA Win Rate": 42.46993358463472,
+      "RegA P&L (%)": -305.6699999999905,
+      "RegB Trades": 700,
+      "RegB Win Rate": 53.28571428571428,
+      "RegB P&L (%)": -57.6327552120806
+    },
+    {
+      "Confidence": ">= 0.60",
+      "Total Signals": 10,
+      "UP Precision": 60.0,
+      "DOWN Precision": 0.0,
+      "Dir Precision": 60.0,
+      "RegA Trades": 10,
+      "RegA Win Rate": 60.0,
+      "RegA P&L (%)": -0.2500000000000001,
+      "RegB Trades": 2,
+      "RegB Win Rate": 100.0,
+      "RegB P&L (%)": 18.331853779305984
+    },
+    {
+      "Confidence": ">= 0.70",
+      "Total Signals": 0,
+      "UP Precision": 0.0,
+      "DOWN Precision": 0.0,
+      "Dir Precision": 0.0,
+      "RegA Trades": 0,
+      "RegA Win Rate": 0.0,
+      "RegA P&L (%)": 0.0,
+      "RegB Trades": 0,
+      "RegB Win Rate": 0.0,
+      "RegB P&L (%)": 0.0
+    },
+    {
+      "Confidence": ">= 0.75",
+      "Total Signals": 0,
+      "UP Precision": 0.0,
+      "DOWN Precision": 0.0,
+      "Dir Precision": 0.0,
+      "RegA Trades": 0,
+      "RegA Win Rate": 0.0,
+      "RegA P&L (%)": 0.0,
+      "RegB Trades": 0,
+      "RegB Win Rate": 0.0,
+      "RegB P&L (%)": 0.0
+    }
+  ],
+  "xgb_sub_periods": [
+    {
+      "sub_period": "Q1",
+      "trades": 248,
+      "win_rate": 43.54838709677419,
+      "pnl": -24.791316519141535
+    },
+    {
+      "sub_period": "Q2",
+      "trades": 383,
+      "win_rate": 50.13054830287206,
+      "pnl": -46.27852287237024
+    },
+    {
+      "sub_period": "Q3",
+      "trades": 426,
+      "win_rate": 61.267605633802816,
+      "pnl": -12.698974243862002
+    },
+    {
+      "sub_period": "Q4",
+      "trades": 241,
+      "win_rate": 51.867219917012456,
+      "pnl": -11.524113378581317
+    }
+  ],
+  "lgb_sub_periods": [
+    {
+      "sub_period": "Q1",
+      "trades": 75,
+      "win_rate": 53.333333333333336,
+      "pnl": -9.360156018855303
+    },
+    {
+      "sub_period": "Q2",
+      "trades": 202,
+      "win_rate": 50.99009900990099,
+      "pnl": -25.134393550931584
+    },
+    {
+      "sub_period": "Q3",
+      "trades": 273,
+      "win_rate": 56.776556776556774,
+      "pnl": -17.708766728830113
+    },
+    {
+      "sub_period": "Q4",
+      "trades": 150,
+      "win_rate": 50.0,
+      "pnl": -5.429438913463631
+    }
+  ],
+  "catboost": [
+    {
+      "Confidence": "No Filter",
+      "Total Signals": 168966,
+      "UP Precision": 30.123531548988737,
+      "DOWN Precision": 28.54414556229455,
+      "Dir Precision": 29.31595705644923,
+      "RegA Trades": 168966,
+      "RegA Win Rate": 29.31595705644923,
+      "RegA P&L (%)": -11068.319999986657,
+      "RegB Trades": 19717,
+      "RegB Win Rate": 26.033372216868695,
+      "RegB P&L (%)": -1377.213167375925
+    },
+    {
+      "Confidence": ">= 0.50",
+      "Total Signals": 2592,
+      "UP Precision": 46.073662265462126,
+      "DOWN Precision": 44.058976582827405,
+      "Dir Precision": 45.17746913580247,
+      "RegA Trades": 2592,
+      "RegA Win Rate": 45.17746913580247,
+      "RegA P&L (%)": -141.8399999999976,
+      "RegB Trades": 385,
+      "RegB Win Rate": 52.98701298701298,
+      "RegB P&L (%)": -32.677266426294736
+    },
+    {
+      "Confidence": ">= 0.60",
+      "Total Signals": 0,
+      "UP Precision": 0.0,
+      "DOWN Precision": 0.0,
+      "Dir Precision": 0.0,
+      "RegA Trades": 0,
+      "RegA Win Rate": 0.0,
+      "RegA P&L (%)": 0.0,
+      "RegB Trades": 0,
+      "RegB Win Rate": 0.0,
+      "RegB P&L (%)": 0.0
+    },
+    {
+      "Confidence": ">= 0.70",
+      "Total Signals": 0,
+      "UP Precision": 0.0,
+      "DOWN Precision": 0.0,
+      "Dir Precision": 0.0,
+      "RegA Trades": 0,
+      "RegA Win Rate": 0.0,
+      "RegA P&L (%)": 0.0,
+      "RegB Trades": 0,
+      "RegB Win Rate": 0.0,
+      "RegB P&L (%)": 0.0
+    },
+    {
+      "Confidence": ">= 0.75",
+      "Total Signals": 0,
+      "UP Precision": 0.0,
+      "DOWN Precision": 0.0,
+      "Dir Precision": 0.0,
+      "RegA Trades": 0,
+      "RegA Win Rate": 0.0,
+      "RegA P&L (%)": 0.0,
+      "RegB Trades": 0,
+      "RegB Win Rate": 0.0,
+      "RegB P&L (%)": 0.0
+    }
+  ],
+  "cat_sub_periods": [
+    {
+      "sub_period": "Q1",
+      "trades": 28,
+      "win_rate": 39.285714285714285,
+      "pnl": -10.738232446654756
+    },
+    {
+      "sub_period": "Q2",
+      "trades": 105,
+      "win_rate": 49.523809523809526,
+      "pnl": -19.344961143934885
+    },
+    {
+      "sub_period": "Q3",
+      "trades": 181,
+      "win_rate": 51.93370165745856,
+      "pnl": -19.129532052063357
+    },
+    {
+      "sub_period": "Q4",
+      "trades": 71,
+      "win_rate": 66.19718309859155,
+      "pnl": 16.535459216358248
+    }
+  ]
+}

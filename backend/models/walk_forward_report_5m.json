@@ -1,0 +1,371 @@
+{
+  "parameters": {
+    "tp": 0.3,
+    "sl": 0.3,
+    "hold": 60,
+    "tf": 5,
+    "windows": 4
+  },
+  "windows": [
+    {
+      "window": 1,
+      "train_range": [
+        0,
+        410969
+      ],
+      "test_range": [
+        410969,
+        479463
+      ],
+      "primary_accuracy": 0.4911,
+      "primary_best_iter": 4,
+      "meta_best_iter": 300,
+      "threshold_results": {
+        "NO FILTER": {
+          "total_trades": 68429,
+          "wins": 33588,
+          "losses": 34841,
+          "win_rate": 0.4908,
+          "profit_factor": 0.624,
+          "net_expectancy": -0.068,
+          "sharpe_ratio": -0.2846,
+          "max_drawdown_pct": 4660.65,
+          "cumulative_pnl_pct": -4655.03,
+          "turnover": 0.9991
+        },
+        "P>=0.30": {
+          "total_trades": 67138,
+          "wins": 33088,
+          "losses": 34050,
+          "win_rate": 0.4928,
+          "profit_factor": 0.6251,
+          "net_expectancy": -0.068,
+          "sharpe_ratio": -0.2866,
+          "max_drawdown_pct": 4570.58,
+          "cumulative_pnl_pct": -4564.96,
+          "turnover": 0.9802
+        },
+        "P>=0.35": {
+          "total_trades": 65881,
+          "wins": 32511,
+          "losses": 33370,
+          "win_rate": 0.4935,
+          "profit_factor": 0.6244,
+          "net_expectancy": -0.0683,
+          "sharpe_ratio": -0.2902,
+          "max_drawdown_pct": 4502.99,
+          "cumulative_pnl_pct": -4497.37,
+          "turnover": 0.9619
+        },
+        "P>=0.40": {
+          "total_trades": 63146,
+          "wins": 31273,
+          "losses": 31873,
+          "win_rate": 0.4952,
+          "profit_factor": 0.6265,
+          "net_expectancy": -0.0679,
+          "sharpe_ratio": -0.2945,
+          "max_drawdown_pct": 4294.14,
+          "cumulative_pnl_pct": -4288.52,
+          "turnover": 0.9219
+        },
+        "P>=0.45": {
+          "total_trades": 54595,
+          "wins": 27091,
+          "losses": 27504,
+          "win_rate": 0.4962,
+          "profit_factor": 0.6249,
+          "net_expectancy": -0.0685,
+          "sharpe_ratio": -0.3188,
+          "max_drawdown_pct": 3745.74,
+          "cumulative_pnl_pct": -3739.75,
+          "turnover": 0.7971
+        },
+        "P>=0.50": {
+          "total_trades": 25866,
+          "wins": 13072,
+          "losses": 12794,
+          "win_rate": 0.5054,
+          "profit_factor": 0.6469,
+          "net_expectancy": -0.0634,
+          "sharpe_ratio": -0.4288,
+          "max_drawdown_pct": 1643.65,
+          "cumulative_pnl_pct": -1641.12,
+          "turnover": 0.3776
+        }
+      }
+    },
+    {
+      "window": 2,
+      "train_range": [
+        68494,
+        479463
+      ],
+      "test_range": [
+        479463,
+        547957
+      ],
+      "primary_accuracy": 0.4837,
+      "primary_best_iter": 300,
+      "meta_best_iter": 7,
+      "threshold_results": {
+        "NO FILTER": {
+          "total_trades": 65652,
+          "wins": 32748,
+          "losses": 32904,
+          "win_rate": 0.4988,
+          "profit_factor": 0.633,
+          "net_expectancy": -0.0665,
+          "sharpe_ratio": -0.2826,
+          "max_drawdown_pct": 4375.29,
+          "cumulative_pnl_pct": -4366.74,
+          "turnover": 0.9585
+        },
+        "P>=0.30": {
+          "total_trades": 65652,
+          "wins": 32748,
+          "losses": 32904,
+          "win_rate": 0.4988,
+          "profit_factor": 0.633,
+          "net_expectancy": -0.0665,
+          "sharpe_ratio": -0.2826,
+          "max_drawdown_pct": 4375.29,
+          "cumulative_pnl_pct": -4366.74,
+          "turnover": 0.9585
+        },
+        "P>=0.35": {
+          "total_trades": 65652,
+          "wins": 32748,
+          "losses": 32904,
+          "win_rate": 0.4988,
+          "profit_factor": 0.633,
+          "net_expectancy": -0.0665,
+          "sharpe_ratio": -0.2826,
+          "max_drawdown_pct": 4375.29,
+          "cumulative_pnl_pct": -4366.74,
+          "turnover": 0.9585
+        },
+        "P>=0.40": {
+          "total_trades": 65652,
+          "wins": 32748,
+          "losses": 32904,
+          "win_rate": 0.4988,
+          "profit_factor": 0.633,
+          "net_expectancy": -0.0665,
+          "sharpe_ratio": -0.2826,
+          "max_drawdown_pct": 4375.29,
+          "cumulative_pnl_pct": -4366.74,
+          "turnover": 0.9585
+        },
+        "P>=0.45": {
+          "total_trades": 65651,
+          "wins": 32747,
+          "losses": 32904,
+          "win_rate": 0.4988,
+          "profit_factor": 0.633,
+          "net_expectancy": -0.0665,
+          "sharpe_ratio": -0.2826,
+          "max_drawdown_pct": 4375.52,
+          "cumulative_pnl_pct": -4366.97,
+          "turnover": 0.9585
+        },
+        "P>=0.50": {
+          "total_trades": 27591,
+          "wins": 13989,
+          "losses": 13602,
+          "win_rate": 0.507,
+          "profit_factor": 0.6558,
+          "net_expectancy": -0.0612,
+          "sharpe_ratio": -0.4015,
+          "max_drawdown_pct": 1700.91,
+          "cumulative_pnl_pct": -1688.67,
+          "turnover": 0.4028
+        }
+      }
+    },
+    {
+      "window": 3,
+      "train_range": [
+        136988,
+        547957
+      ],
+      "test_range": [
+        547957,
+        616451
+      ],
+      "primary_accuracy": 0.4406,
+      "primary_best_iter": 300,
+      "meta_best_iter": 7,
+      "threshold_results": {
+        "NO FILTER": {
+          "total_trades": 58434,
+          "wins": 28094,
+          "losses": 30340,
+          "win_rate": 0.4808,
+          "profit_factor": 0.6062,
+          "net_expectancy": -0.0718,
+          "sharpe_ratio": -0.3265,
+          "max_drawdown_pct": 4197.71,
+          "cumulative_pnl_pct": -4198.08,
+          "turnover": 0.8531
+        },
+        "P>=0.30": {
+          "total_trades": 58434,
+          "wins": 28094,
+          "losses": 30340,
+          "win_rate": 0.4808,
+          "profit_factor": 0.6062,
+          "net_expectancy": -0.0718,
+          "sharpe_ratio": -0.3265,
+          "max_drawdown_pct": 4197.71,
+          "cumulative_pnl_pct": -4198.08,
+          "turnover": 0.8531
+        },
+        "P>=0.35": {
+          "total_trades": 58434,
+          "wins": 28094,
+          "losses": 30340,
+          "win_rate": 0.4808,
+          "profit_factor": 0.6062,
+          "net_expectancy": -0.0718,
+          "sharpe_ratio": -0.3265,
+          "max_drawdown_pct": 4197.71,
+          "cumulative_pnl_pct": -4198.08,
+          "turnover": 0.8531
+        },
+        "P>=0.40": {
+          "total_trades": 58434,
+          "wins": 28094,
+          "losses": 30340,
+          "win_rate": 0.4808,
+          "profit_factor": 0.6062,
+          "net_expectancy": -0.0718,
+          "sharpe_ratio": -0.3265,
+          "max_drawdown_pct": 4197.71,
+          "cumulative_pnl_pct": -4198.08,
+          "turnover": 0.8531
+        },
+        "P>=0.45": {
+          "total_trades": 58422,
+          "wins": 28085,
+          "losses": 30337,
+          "win_rate": 0.4807,
+          "profit_factor": 0.606,
+          "net_expectancy": -0.0719,
+          "sharpe_ratio": -0.3267,
+          "max_drawdown_pct": 4198.97,
+          "cumulative_pnl_pct": -4199.34,
+          "turnover": 0.853
+        },
+        "P>=0.50": {
+          "total_trades": 31000,
+          "wins": 14651,
+          "losses": 16349,
+          "win_rate": 0.4726,
+          "profit_factor": 0.5897,
+          "net_expectancy": -0.0756,
+          "sharpe_ratio": -0.473,
+          "max_drawdown_pct": 2351.23,
+          "cumulative_pnl_pct": -2344.9,
+          "turnover": 0.4526
+        }
+      }
+    },
+    {
+      "window": 4,
+      "train_range": [
+        205482,
+        616451
+      ],
+      "test_range": [
+        616451,
+        684945
+      ],
+      "primary_accuracy": 0.4717,
+      "primary_best_iter": 300,
+      "meta_best_iter": 7,
+      "threshold_results": {
+        "NO FILTER": {
+          "total_trades": 63401,
+          "wins": 31033,
+          "losses": 32368,
+          "win_rate": 0.4895,
+          "profit_factor": 0.6177,
+          "net_expectancy": -0.0697,
+          "sharpe_ratio": -0.3025,
+          "max_drawdown_pct": 4418.98,
+          "cumulative_pnl_pct": -4417.97,
+          "turnover": 0.9256
+        },
+        "P>=0.30": {
+          "total_trades": 63401,
+          "wins": 31033,
+          "losses": 32368,
+          "win_rate": 0.4895,
+          "profit_factor": 0.6177,
+          "net_expectancy": -0.0697,
+          "sharpe_ratio": -0.3025,
+          "max_drawdown_pct": 4418.98,
+          "cumulative_pnl_pct": -4417.97,
+          "turnover": 0.9256
+        },
+        "P>=0.35": {
+          "total_trades": 63401,
+          "wins": 31033,
+          "losses": 32368,
+          "win_rate": 0.4895,
+          "profit_factor": 0.6177,
+          "net_expectancy": -0.0697,
+          "sharpe_ratio": -0.3025,
+          "max_drawdown_pct": 4418.98,
+          "cumulative_pnl_pct": -4417.97,
+          "turnover": 0.9256
+        },
+        "P>=0.40": {
+          "total_trades": 63401,
+          "wins": 31033,
+          "losses": 32368,
+          "win_rate": 0.4895,
+          "profit_factor": 0.6177,
+          "net_expectancy": -0.0697,
+          "sharpe_ratio": -0.3025,
+          "max_drawdown_pct": 4418.98,
+          "cumulative_pnl_pct": -4417.97,
+          "turnover": 0.9256
+        },
+        "P>=0.45": {
+          "total_trades": 63390,
+          "wins": 31027,
+          "losses": 32363,
+          "win_rate": 0.4895,
+          "profit_factor": 0.6177,
+          "net_expectancy": -0.0697,
+          "sharpe_ratio": -0.3025,
+          "max_drawdown_pct": 4418.51,
+          "cumulative_pnl_pct": -4417.5,
+          "turnover": 0.9255
+        },
+        "P>=0.50": {
+          "total_trades": 40592,
+          "wins": 19524,
+          "losses": 21068,
+          "win_rate": 0.481,
+          "profit_factor": 0.5934,
+          "net_expectancy": -0.0758,
+          "sharpe_ratio": -0.4105,
+          "max_drawdown_pct": 3077.65,
+          "cumulative_pnl_pct": -3076.64,
+          "turnover": 0.5926
+        }
+      }
+    }
+  ],
+  "aggregate": {
+    "baseline_avg_pf": 0.6202,
+    "baseline_avg_ev": -0.069,
+    "filtered_avg_pf": 0.6209,
+    "filtered_avg_ev": -0.069,
+    "stable": false
+  },
+  "elapsed_seconds": 180.20688819885254
+}
