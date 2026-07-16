@@ -1,6 +1,10 @@
 #!/bin/bash
 # Script to run advanced GPU ML model training
-PYTHON_PATH="/media/sun/DATA/PythonEnv/ComfyUI/venv/bin/python"
+if [ -f "./venv/bin/python" ]; then
+    PYTHON_PATH="./venv/bin/python"
+else
+    PYTHON_PATH="/media/sun/DATA/PythonEnv/ComfyUI/venv/bin/python"
+fi
 
 echo "=== KriptoSakti Advanced ML Training Engine ==="
 echo "Model Options: xgboost, catboost, lightgbm, pytorch"

@@ -25,4 +25,10 @@ echo "=========================================================="
 echo ""
 
 # Start FastAPI backend which also serves frontend static files from dist/ folder
-/media/sun/DATA/PythonEnv/ComfyUI/venv/bin/python -m backend.main
+if [ -f "./venv/bin/python" ]; then
+    PYTHON_EXEC="./venv/bin/python"
+else
+    PYTHON_EXEC="/media/sun/DATA/PythonEnv/ComfyUI/venv/bin/python"
+fi
+
+$PYTHON_EXEC -m backend.main
