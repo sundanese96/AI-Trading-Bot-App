@@ -19,6 +19,7 @@ import {
   Bot,
   Activity,
   LogOut,
+  HelpCircle,
 } from "lucide-react";
 
 import { PortfolioData, TradePosition, NewsArticle, MacroEvent, MLModel, NotificationSettings, NotificationLog, Candlestick, BacktestParams, LlmSettings } from "./types";
@@ -28,6 +29,7 @@ import { BacktestPanel } from "./components/BacktestPanel";
 import { MLPanel } from "./components/MLPanel";
 import { SettingsPanel } from "./components/SettingsPanel";
 import { AIBotPanel } from "./components/AIBotPanel";
+import { DocsPanel } from "./components/DocsPanel";
 import { ErrorBoundary } from "./components/ErrorBoundary";
 import { CorrelationMatrix } from "./components/CorrelationMatrix";
 import { CryptoTicker } from "./components/CryptoTicker";
@@ -39,7 +41,7 @@ import { LoginScreen } from "./components/LoginScreen";
 
 export default function App() {
   const [isAuthenticated, setIsAuthenticated] = useState<boolean | null>(null);
-  const [activeTab, setActiveTab] = useState<"TRADING" | "NEWS" | "BACKTEST" | "ML" | "AI_BOT" | "SETTINGS" | "LIVE">("TRADING");
+  const [activeTab, setActiveTab] = useState<"TRADING" | "NEWS" | "BACKTEST" | "ML" | "AI_BOT" | "SETTINGS" | "LIVE" | "DOCS">("TRADING");
 
   // Tab Visit Flags to lazy-mount tabs and keep them persistently mounted once visited
   const [newsVisited, setNewsVisited] = useState(false);
@@ -48,6 +50,7 @@ export default function App() {
   const [aiBotVisited, setAiBotVisited] = useState(false);
   const [settingsVisited, setSettingsVisited] = useState(false);
   const [liveVisited, setLiveVisited] = useState(false);
+  const [docsVisited, setDocsVisited] = useState(false);
 
   useEffect(() => {
     if (activeTab === "NEWS") setNewsVisited(true);
@@ -56,6 +59,7 @@ export default function App() {
     if (activeTab === "AI_BOT") setAiBotVisited(true);
     if (activeTab === "SETTINGS") setSettingsVisited(true);
     if (activeTab === "LIVE") setLiveVisited(true);
+    if (activeTab === "DOCS") setDocsVisited(true);
   }, [activeTab]);
 
 
@@ -560,6 +564,14 @@ export default function App() {
             >
               <Activity className="h-3.5 w-3.5 text-amber-500" /> LIVE TRADING
             </button>
+            <button
+              onClick={() => setActiveTab("DOCS")}
+              className={`flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg text-xs font-bold transition font-sans cursor-pointer ${
+                activeTab === "DOCS" ? "bg-slate-900 text-indigo-400 border border-slate-850" : "text-slate-500 hover:text-slate-300"
+              }`}
+            >
+              <HelpCircle className="h-3.5 w-3.5" /> Docs / About
+            </button>
           </div>
 
           {/* Reset / Controls */}
@@ -1060,6 +1072,12 @@ export default function App() {
                 selectedCoin={selectedCoin}
                 active={activeTab === "LIVE"}
               />
+            </div>
+          )}
+
+          {docsVisited && (
+            <div style={{ display: activeTab === "DOCS" ? "block" : "none" }}>
+              <DocsPanel />
             </div>
           )}
         </ErrorBoundary>
