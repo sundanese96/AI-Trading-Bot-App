@@ -5,6 +5,7 @@ Maps Express-style endpoints to FastAPI routes so the Sentix React UI works seam
 import time
 import json
 import asyncio
+from typing import Dict, Any, List
 from fastapi import APIRouter, Request, Response
 from backend.config import DB_PATH
 from backend.database import db_lock, read_database, write_database, load_ai_config, save_ai_config
@@ -160,36 +161,130 @@ async def execute_trade(request: Request):
     _save_sentix_db()
     return {"success": True, "message": "Order berhasil dieksekusi.", "trades": sentix_state["trades"]}
 
-@router.post("/api/trade/close")
-async def close_trade(request: Request):
-    body = await request.json()
-    trade_id = body.get("tradeId")
-    if not trade_id:
-        return {"success": False, "message": "ID Transaksi wajib diisi."}
-
-    prices = _get_current_prices()
+def close_active_position(trade_id: str, exit_price: float = None) -> Dict[str, Any]:
+    """
+    Modular function to close an active position in both sentix_state (db.json)
+    and database.json, updating portfolio balances, calculating PnL, and saving databases.
+    """
+    _load_sentix_db()
+    
     trade = next((t for t in sentix_state["trades"] if t["id"] == trade_id and t["status"] == "OPEN"), None)
     if not trade:
-        return {"success": False, "message": "Transaksi aktif tidak ditemukan."}
+        return {"success": False, "message": "Transaksi aktif tidak ditemukan di Sentix."}
 
-    live_price = prices.get(trade["symbol"], trade["entryPrice"])
+    prices = _get_current_prices()
+    live_price = exit_price or prices.get(trade["symbol"], trade["entryPrice"])
+    
     trade["status"] = "CLOSED"
     trade["exitPrice"] = live_price
     trade["exitTimestamp"] = int(time.time() * 1000)
     trade["reason"] = "MANUAL"
-
+    
     price_diff = (live_price - trade["entryPrice"]) if trade["type"] == "BUY" else (trade["entryPrice"] - live_price)
     raw_return = price_diff / trade["entryPrice"]
     fee = trade["size"] * trade["entryPrice"] * 0.001
     gross_pnl = raw_return * (trade["size"] * trade["entryPrice"])
     net_pnl = gross_pnl - fee
     trade["pnl"] = round(net_pnl, 2)
-
+    
     margin_used = (trade["size"] * trade["entryPrice"]) / trade["leverage"]
     refund = margin_used + net_pnl
     sentix_state["portfolio"]["balanceUSD"] = round(sentix_state["portfolio"]["balanceUSD"] + refund, 2)
+    
     _save_sentix_db()
+    
+    # Try to close matching trade in database.json
+    try:
+        from backend.database import read_database, write_database, db_lock
+        
+        # Open and update database.json
+        db = read_database()
+        db_trades = db.get("savedTrades", [])
+        db_updated = False
+        
+        sentix_timestamp = trade.get("timestamp", 0)
+        sentix_type_mapped = "LONG" if trade["type"] == "BUY" else "SHORT"
+        sentix_asset = trade["symbol"].replace("USDT", "")
+        
+        for db_trade in db_trades:
+            if db_trade.get("status") == "OPEN":
+                db_timestamp = db_trade.get("timestamp", 0)
+                db_decision = db_trade.get("decision")
+                db_asset = db_trade.get("targetAsset", "")
+                
+                # Check if it matches within a 10 seconds difference window, same asset and direction
+                time_match = abs(db_timestamp - sentix_timestamp) < 10000
+                type_match = db_decision == sentix_type_mapped
+                asset_match = db_asset == sentix_asset or db_asset in trade["symbol"]
+                
+                if time_match and type_match and asset_match:
+                    db_trade["status"] = "CLOSED"
+                    db_trade["exitPrice"] = live_price
+                    db_trade["closeTime"] = int(time.time() * 1000)
+                    db_trade["closeReason"] = "MANUAL"
+                    
+                    pnl_pct = (price_diff / trade["entryPrice"]) * 100 * trade["leverage"]
+                    db_trade["pnl"] = round(pnl_pct, 2)
+                    
+                    if "pnlLog" not in db:
+                        db["pnlLog"] = []
+                    db["pnlLog"].append({
+                        "timestamp": int(time.time() * 1000),
+                        "pnl": round(pnl_pct, 2)
+                    })
+                    db_updated = True
+                
+        if db_updated:
+            write_database(db)
+            
+    except Exception as e:
+        print(f"[Sentix Adapter] Error closing matching trade in database.json: {e}")
+        
     return {"success": True, "message": "Posisi berhasil ditutup.", "trades": sentix_state["trades"]}
+
+def close_active_position_by_timestamp(timestamp: int, exit_price: float, reason: str = "AUTO") -> bool:
+    """
+    Closes an active position in Sentix (db.json) matching the given timestamp (fuzzy matched).
+    """
+    _load_sentix_db()
+    
+    # Try exact match first
+    trade = next((t for t in sentix_state["trades"] if t["status"] == "OPEN" and t.get("timestamp") == timestamp), None)
+    
+    if not trade:
+        # Fuzzy match within 10 seconds (10,000 milliseconds)
+        trade = next((t for t in sentix_state["trades"] if t["status"] == "OPEN" and abs(t.get("timestamp", 0) - timestamp) < 10000), None)
+        
+    if not trade:
+        return False
+        
+    trade["status"] = "CLOSED"
+    trade["exitPrice"] = exit_price
+    trade["exitTimestamp"] = int(time.time() * 1000)
+    trade["reason"] = reason
+    
+    price_diff = (exit_price - trade["entryPrice"]) if trade["type"] == "BUY" else (trade["entryPrice"] - exit_price)
+    raw_return = price_diff / trade["entryPrice"]
+    fee = trade["size"] * trade["entryPrice"] * 0.001
+    gross_pnl = raw_return * (trade["size"] * trade["entryPrice"])
+    net_pnl = gross_pnl - fee
+    trade["pnl"] = round(net_pnl, 2)
+    
+    margin_used = (trade["size"] * trade["entryPrice"]) / trade["leverage"]
+    refund = margin_used + net_pnl
+    sentix_state["portfolio"]["balanceUSD"] = round(sentix_state["portfolio"]["balanceUSD"] + refund, 2)
+    
+    _save_sentix_db()
+    return True
+
+@router.post("/api/trade/close")
+async def close_trade(request: Request):
+    body = await request.json()
+    trade_id = body.get("tradeId")
+    if not trade_id:
+        return {"success": False, "message": "ID Transaksi wajib diisi."}
+    
+    return close_active_position(trade_id)
 
 
 # ==========================================
@@ -252,11 +347,12 @@ async def save_ai_bot_settings(request: Request):
 
 @router.get("/api/ai-bot/status")
 async def get_ai_bot_status(response: Response):
+    _load_sentix_db()
     response.headers["Cache-Control"] = "no-cache, no-store, must-revalidate"
     response.headers["Pragma"] = "no-cache"
     response.headers["Expires"] = "0"
     bot = sentix_state["aiBotSettings"]
-    active_trades = [t for t in sentix_state["trades"] if t["status"] == "OPEN" and ("bot" in t["id"] or t.get("reason") == "AI_BOT")]
+    active_trades = [t for t in sentix_state["trades"] if t["status"] == "OPEN" and ("bot" in t["id"] or t.get("reason") == "AI_BOT" or t.get("reason", "").startswith("AI_BOT"))]
     logs = sentix_state.get("aiBotLogs", [])
     last_log_time = logs[0]["timestamp"] if logs else 0
 

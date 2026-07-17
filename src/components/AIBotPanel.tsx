@@ -193,9 +193,14 @@ const [settings, setSettings] = useState<AiBotSettings>({
         body: JSON.stringify({ tradeId })
       });
       if (response.ok) {
-        setStatusMsg({ text: "✅ Posisi berhasil ditutup secara manual.", isError: false });
-        setSelectedTrade(null);
-        fetchBotStatus();
+        const resData = await response.json();
+        if (resData.success) {
+          setStatusMsg({ text: "✅ Posisi berhasil ditutup secara manual.", isError: false });
+          setSelectedTrade(null);
+          fetchBotStatus();
+        } else {
+          throw new Error(resData.message || "Gagal menutup posisi.");
+        }
       } else {
         const errData = await response.json();
         throw new Error(errData.message || "Gagal menutup posisi.");

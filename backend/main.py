@@ -517,6 +517,13 @@ async def monitor_simulated_positions_loop():
                             trade["closeTime"] = int(time.time() * 1000)
                             trade["closeReason"] = close_reason
                             
+                            # Also close matching trade in Sentix db.json
+                            try:
+                                from backend.sentix_adapter import close_active_position_by_timestamp
+                                close_active_position_by_timestamp(trade.get("timestamp"), cur_price, close_reason)
+                            except Exception as sentix_err:
+                                print(f"[Sim Position Monitor] Error closing Sentix trade: {sentix_err}")
+                            
                             # Append to pnlLog for rolling daily stats
                             if "pnlLog" not in db:
                                 db["pnlLog"] = []
