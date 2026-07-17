@@ -555,6 +555,43 @@ const [settings, setSettings] = useState<AiBotSettings>({
         </div>
       )}
 
+      {/* Persistent Strategy Warning/Info Banner */}
+      {botStatus.automationEnabled && (
+        <div className={`p-4 rounded-2xl border text-xs flex flex-col md:flex-row md:items-center justify-between gap-3 transition duration-300 ${
+          ["HEDGING", "AGGRESSIVE", "SCALPING"].includes(settings.strategy)
+            ? "bg-amber-500/5 text-amber-400 border-amber-500/15" 
+            : "bg-emerald-500/5 text-emerald-400 border-emerald-500/15"
+        }`}>
+          <div className="flex items-start gap-3">
+            <span className="text-base mt-0.5">
+              {["HEDGING", "AGGRESSIVE", "SCALPING"].includes(settings.strategy) ? "⚠️" : "🛡️"}
+            </span>
+            <div className="space-y-1">
+              <p className="font-bold font-sans">
+                Status Strategi Aktif: <span className="font-mono text-white underline decoration-dotted">{settings.strategy}</span>
+              </p>
+              <p className="text-[11px] text-slate-400 leading-normal">
+                {settings.strategy === "HEDGING" && "Mode Lindung Nilai Aktif. Robot akan membuka posisi dua arah untuk memproteksi modal, dan mengabaikan Konfirmator ML (Veto Gate) untuk eksekusi langsung."}
+                {settings.strategy === "AGGRESSIVE" && "Mode Agresif Aktif. Sensitivitas sinyal maksimal, leverage tinggi, dan mengabaikan Konfirmator ML (Veto Gate) untuk eksekusi langsung."}
+                {settings.strategy === "SCALPING" && "Mode Scalping Aktif. Eksekusi cepat pada pergerakan mikro, take profit cepat, dan mengabaikan Konfirmator ML (Veto Gate) untuk eksekusi langsung."}
+                {settings.strategy === "CONSERVATIVE" && "Mode Konservatif Aktif. Robot sangat berhati-hati, mensyaratkan konfirmasi ganda dari Model ML (Veto Gate) sebelum membuka posisi."}
+                {settings.strategy === "SWING" && "Mode Swing Aktif. Mencari tren jangka menengah/panjang dengan target profit lebar, mensyaratkan konfirmasi ganda dari Model ML (Veto Gate) sebelum membuka posisi."}
+                {settings.strategy === "MARTINGALE" && "Mode Martingale Aktif. Melakukan akumulasi bertingkat untuk rata-rata harga masuk, mensyaratkan konfirmasi ganda dari Model ML (Veto Gate) sebelum membuka posisi."}
+              </p>
+            </div>
+          </div>
+          <div className="shrink-0">
+            <span className={`px-2.5 py-1 rounded-full text-[10px] font-mono font-bold uppercase ${
+              ["HEDGING", "AGGRESSIVE", "SCALPING"].includes(settings.strategy)
+                ? "bg-amber-500/10 text-amber-300 border border-amber-500/20"
+                : "bg-emerald-500/10 text-emerald-300 border border-emerald-500/20"
+            }`}>
+              {["HEDGING", "AGGRESSIVE", "SCALPING"].includes(settings.strategy) ? "Veto Gate: Bypassed ⚡" : "Veto Gate: Enforced 🛡️"}
+            </span>
+          </div>
+        </div>
+      )}
+
       {/* Main Grid: Settings & Live Console */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
         {/* Left Column - Configuration forms (7cols) */}
