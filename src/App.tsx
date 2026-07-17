@@ -103,6 +103,8 @@ export default function App() {
   const [orderFeedback, setOrderFeedback] = useState({ text: "", isError: false });
 
   const [isLoadingNews, setIsLoadingNews] = useState(false);
+  const [confirmReset, setConfirmReset] = useState(false);
+  const [confirmLogout, setConfirmLogout] = useState(false);
 
   // Check session status on mount and intercept fetch requests for 401 redirection
   useEffect(() => {
@@ -425,30 +427,26 @@ export default function App() {
     return false;
   };
 
-  // Handler: Logout Session
+  // Handler: Logout process
   const handleLogout = async () => {
-    if (window.confirm("Apakah Anda yakin ingin keluar dari terminal?")) {
-      try {
-        await fetch("/api/logout", { method: "POST" });
-      } catch (err) {
-        console.error("Gagal logout:", err);
-      }
-      setIsAuthenticated(false);
+    try {
+      await fetch("/api/logout", { method: "POST" });
+    } catch (err) {
+      console.error("Gagal logout:", err);
     }
+    setIsAuthenticated(false);
   };
 
   // Handler: Reset Account Balance
   const handleResetPortfolio = async () => {
-    if (window.confirm("Apakah Anda yakin ingin mengatur ulang portofolio kembali ke saldo demo awal $100.000 USD? Semua riwayat posisi akan dibersihkan.")) {
-      try {
-        const response = await fetch("/api/portfolio/reset", { method: "POST" });
-        if (response.ok) {
-          fetchBackendState();
-          alert("Portofolio direset berhasil.");
-        }
-      } catch (err) {
-        console.error(err);
+    try {
+      const response = await fetch("/api/portfolio/reset", { method: "POST" });
+      if (response.ok) {
+        fetchBackendState();
+        setConfirmReset(false);
       }
+    } catch (err) {
+      console.error(err);
     }
   };
 
@@ -581,18 +579,53 @@ export default function App() {
 
           {/* Reset / Controls */}
           <div className="flex gap-2">
-            <button
-              onClick={handleResetPortfolio}
-              className="text-[10px] font-mono bg-red-950/20 border border-red-900/30 hover:border-red-500 hover:text-white text-red-400 px-3 py-1.5 rounded-lg transition active:scale-95 cursor-pointer"
-            >
-              Reset Demo Wallet
-            </button>
-            <button
-              onClick={handleLogout}
-              className="flex items-center gap-1.5 text-[10px] font-mono bg-slate-900/60 border border-slate-800 hover:border-slate-650 hover:border-slate-500 hover:text-white text-slate-400 px-3 py-1.5 rounded-lg transition active:scale-95 cursor-pointer"
-            >
-              <LogOut className="h-3 w-3" /> Keluar
-            </button>
+            {confirmReset ? (
+              <div className="flex items-center gap-1">
+                <button
+                  onClick={handleResetPortfolio}
+                  className="text-[10px] font-mono bg-red-600 hover:bg-red-700 text-white font-bold px-3 py-1.5 rounded-lg transition active:scale-95 cursor-pointer animate-pulse"
+                >
+                  Yakin Reset?
+                </button>
+                <button
+                  onClick={() => setConfirmReset(false)}
+                  className="text-[10px] font-mono bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white px-2 py-1.5 rounded-lg transition cursor-pointer"
+                >
+                  Batal
+                </button>
+              </div>
+            ) : (
+              <button
+                onClick={() => setConfirmReset(true)}
+                className="text-[10px] font-mono bg-red-950/20 border border-red-900/30 hover:border-red-500 hover:text-white text-red-400 px-3 py-1.5 rounded-lg transition active:scale-95 cursor-pointer"
+              >
+                Reset Demo Wallet
+              </button>
+            )}
+
+            {confirmLogout ? (
+              <div className="flex items-center gap-1">
+                <button
+                  onClick={handleLogout}
+                  className="flex items-center gap-1.5 text-[10px] font-mono bg-rose-600 hover:bg-rose-700 text-white font-bold px-3 py-1.5 rounded-lg transition active:scale-95 cursor-pointer"
+                >
+                  Yakin Keluar?
+                </button>
+                <button
+                  onClick={() => setConfirmLogout(false)}
+                  className="text-[10px] font-mono bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white px-2 py-1.5 rounded-lg transition cursor-pointer"
+                >
+                  Batal
+                </button>
+              </div>
+            ) : (
+              <button
+                onClick={() => setConfirmLogout(true)}
+                className="flex items-center gap-1.5 text-[10px] font-mono bg-slate-900/60 border border-slate-800 hover:border-slate-650 hover:border-slate-500 hover:text-white text-slate-400 px-3 py-1.5 rounded-lg transition active:scale-95 cursor-pointer"
+              >
+                <LogOut className="h-3 w-3" /> Keluar
+              </button>
+            )}
           </div>
         </nav>
 
