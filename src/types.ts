@@ -61,7 +61,7 @@ export interface NotificationSettings {
 }
 
 export interface LlmSettings {
-  provider: "openai" | "anthropic" | "deepseek" | "custom" | "simulated";
+  provider: "openai" | "anthropic" | "deepseek" | "custom" | "simulated" | "semburat";
   apiKey: string;
   baseUrl: string;
   modelName: string;

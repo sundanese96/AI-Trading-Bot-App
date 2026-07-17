@@ -176,3 +176,78 @@ async def call_custom(api_key: str, base_url: str, model: str, system_instructio
             
             print(f"[AI Custom Parse Error] Response was not valid JSON/SSE: {text[:500]}")
             raise json_err
+
+async def call_semburat_gateway(base_url: str, model: str, system_instruction: str, prompt: str) -> str:
+    """
+    Adapter to route LLM requests through the custom Semburat/Anthropic API Gateway.
+    Handles both synchronous responses (local models) and polling (asynchronous remote proxy).
+    """
+    import asyncio
+    
+    if not base_url:
+        raise Exception("Custom Base URL is required for Semburat Gateway")
+        
+    clean_url = base_url.rstrip('/')
+    
+    # Combine system instruction and user prompt as expected by the gateway
+    full_prompt = f"{system_instruction}\n\nUser Prompt:\n{prompt}"
+    
+    payload = {
+        "model": model,
+        "prompt": full_prompt,
+        "max_tokens": 4096
+    }
+    
+    submit_url = f"{clean_url}?action=submit"
+    print(f"[Semburat Gateway Submit] URL: {submit_url}, Model: {model}")
+    
+    async with httpx.AsyncClient(verify=False) as client:
+        # 1. Submit Request
+        response = await client.post(submit_url, json=payload, timeout=30.0)
+        if response.status_code != 200:
+            print(f"[Semburat Gateway Error] Submit Status: {response.status_code}, Response: {response.text}")
+            raise Exception(f"Gateway submission failed ({response.status_code}): {response.text}")
+        
+        # Determine if it's async (returns JSON with session_id) or sync (returns raw text or custom JSON)
+        try:
+            data = response.json()
+            session_id = data.get("session_id")
+        except Exception:
+            # If not JSON, it might be raw text return for sync local model
+            return response.text
+            
+        # 2. If it returned a session_id, poll for completion
+        if session_id:
+            status_url = f"{clean_url}?action=status&id={session_id}"
+            max_attempts = 60  # 3 minutes max (60 attempts * 3 seconds)
+            print(f"[Semburat Gateway Async] Session: {session_id}. Polling...")
+            
+            for attempt in range(1, max_attempts + 1):
+                await asyncio.sleep(3.0)  # Wait 3 seconds
+                try:
+                    status_res = await client.get(status_url)
+                    if status_res.status_code != 200:
+                        continue
+                    
+                    status_data = status_res.json()
+                except Exception as poll_err:
+                    print(f"[Semburat Gateway Polling Error] Attempt {attempt}: {poll_err}")
+                    continue
+                
+                status = status_data.get("status")
+                result = status_data.get("result")
+                
+                if status == "ready":
+                    return result  # Returns the generated AI text
+                elif status == "failed":
+                    raise Exception(f"Generation failed on remote proxy: {result}")
+                
+                print(f"[Semburat Gateway Polling] Attempt {attempt}/{max_attempts}: Still processing...")
+            
+            # Timeout reached, clean up server-side files
+            cleanup_url = f"{clean_url}?action=cleanup&id={session_id}"
+            await client.delete(cleanup_url)
+            raise Exception("Gateway request timed out waiting for AI response.")
+            
+        # If JSON was returned but no session_id, return the data itself (or extract result field if structured)
+        return data.get("result", response.text)

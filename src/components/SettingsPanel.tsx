@@ -369,6 +369,7 @@ export function SettingsPanel({
                       <option value="deepseek">DeepSeek AI (V3 / R1)</option>
                       <option value="anthropic">Anthropic (Claude Models)</option>
                       <option value="custom">Custom Endpoint (Ollama / Llama.cpp / Local PC)</option>
+                      <option value="semburat">Semburat API Gateway (Sync & Async Polling)</option>
                     </select>
                   </div>
 
@@ -381,8 +382,8 @@ export function SettingsPanel({
                     <input
                       type="password"
                       placeholder={
-                        provider === "custom"
-                          ? "Opsional untuk model lokal..."
+                        provider === "custom" || provider === "semburat"
+                          ? "Opsional untuk model lokal / gateway..."
                           : provider === "simulated"
                           ? "Tidak diperlukan untuk mode simulasi..."
                           : "Masukkan API Key anda (sk-...)"
@@ -410,6 +411,8 @@ export function SettingsPanel({
                           ? "https://api.anthropic.com"
                           : provider === "custom"
                           ? "Contoh: http://localhost:11434/v1"
+                          : provider === "semburat"
+                          ? "Contoh: http://semburat.online"
                           : "Kosong (menggunakan default internal)..."
                       }
                       disabled={provider === "simulated"}
@@ -433,6 +436,8 @@ export function SettingsPanel({
                           ? "claude-3-5-haiku-latest"
                           : provider === "custom"
                           ? "llama3"
+                          : provider === "semburat"
+                          ? "claude-3-5-sonnet-20241022"
                           : "Simulation Engine"
                       }
                       disabled={provider === "simulated"}

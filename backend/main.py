@@ -20,7 +20,7 @@ from backend.services.market import (
     calculate_news_sentiment_index, market_simulation_loop, real_prices_loop, fear_and_greed_loop
 )
 from backend.services.news import news_feed, analyze_sentiment, AFINN
-from backend.services.ai import call_gemini, call_openai, call_anthropic, call_custom, clean_and_parse_json
+from backend.services.ai import call_gemini, call_openai, call_anthropic, call_custom, call_semburat_gateway, clean_and_parse_json
 from backend.services.scraper import scrape_reuters_news, scrape_bbc_news, fetch_forexfactory_calendar, fetch_crypto_panic_news
 from backend.services.position_monitor import monitor_binance_positions_loop
 from backend.services.ml.model import train_model, load_model
@@ -1199,6 +1199,8 @@ async def analyze_ai(req: AIAnalyzeRequest):
         api_key = req.customKey or ANTHROPIC_API_KEY
     elif req.provider == "custom":
         api_key = req.customKey or CUSTOM_AI_KEY
+    elif req.provider == "semburat":
+        api_key = req.customKey or CUSTOM_AI_KEY or "semburat"
 
     # Calculate Volatility Context
     vol_list = []
@@ -1214,7 +1216,7 @@ async def analyze_ai(req: AIAnalyzeRequest):
     fear_and_greed_context = f"Current FNG Value: {fng_cache['value']} ({fng_cache['value_classification']})" if fng_cache else "Current FNG Value: 50 (Neutral)"
 
     has_no_key = not api_key or api_key in ["MY_GEMINI_API_KEY", "MY_OPENAI_API_KEY", "MY_ANTHROPIC_API_KEY"]
-    use_fallback = has_no_key and (req.provider != "custom" or not req.customUrl)
+    use_fallback = has_no_key and (req.provider not in ["custom", "semburat"] or not req.customUrl)
 
     if use_fallback:
         print(f"No API key provided for {req.provider}. Using high-fidelity local fallback classifier.")
@@ -1515,6 +1517,8 @@ Gunakan data real-time, volatilitas pasar, sentimen berita, indeks Fear & Greed,
             used_model = req.customModel or "claude-3-5-sonnet-20241022"
         elif req.provider == "custom":
             used_model = req.customModel or "custom-model"
+        elif req.provider == "semburat":
+            used_model = req.customModel or "claude-3-5-sonnet-20241022"
 
         # Cache key based on provider, model and headline (to prevent token waste)
         cache_key = (req.provider, used_model, req.headline)
@@ -1533,6 +1537,8 @@ Gunakan data real-time, volatilitas pasar, sentimen berita, indeks Fear & Greed,
                     response_text = await call_anthropic(api_key, used_model, system_instruction_to_use, prompt)
                 elif req.provider == "custom":
                     response_text = await call_custom(api_key, req.customUrl, used_model, system_instruction_to_use, prompt)
+                elif req.provider == "semburat":
+                    response_text = await call_semburat_gateway(req.customUrl, used_model, system_instruction_to_use, prompt)
                 else:
                     raise ValueError(f"Unknown provider: {req.provider}")
             except Exception as call_err:
@@ -2306,9 +2312,11 @@ Tentukan arah pergerakan pasar untuk target asset ({base_asset}), dampak krisis 
             api_key = ANTHROPIC_API_KEY
         elif llm_provider == "custom":
             api_key = CUSTOM_AI_KEY
+        elif llm_provider == "semburat":
+            api_key = CUSTOM_AI_KEY or "semburat"
 
     has_no_key = not api_key or api_key in ["MY_GEMINI_API_KEY", "MY_OPENAI_API_KEY", "MY_ANTHROPIC_API_KEY"]
-    use_fallback = has_no_key and (llm_provider != "custom" or not custom_base_url)
+    use_fallback = has_no_key and (llm_provider not in ["custom", "semburat"] or not custom_base_url)
     
     raw_response = ""
     try:
@@ -2321,6 +2329,9 @@ Tentukan arah pergerakan pasar untuk target asset ({base_asset}), dampak krisis 
         elif llm_provider == "anthropic":
             used_model = "claude-3-5-sonnet-20241022"
             raw_response = await call_anthropic(api_key, used_model, system_instruction, prompt)
+        elif llm_provider == "semburat":
+            used_model = custom_model or "claude-3-5-sonnet-20241022"
+            raw_response = await call_semburat_gateway(custom_base_url, used_model, system_instruction, prompt)
         else:
             used_model = custom_model or "custom-model"
             custom_system_instruction = f"""Anda adalah analis kuantitatif senior dan AI Trading Bot. Tentukan arah pergerakan pasar untuk target asset ({base_asset}), dampak krisis berdasarkan berita, dan buat keputusan trading otomatis (tradeDecision) beserta 'confidence score' (0-100) dalam format JSON.
