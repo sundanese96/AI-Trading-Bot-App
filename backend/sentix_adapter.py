@@ -339,6 +339,19 @@ async def save_notification_settings(request: Request):
     body = await request.json()
     sentix_state["notificationSettings"].update(body)
     _save_sentix_db()
+    
+    # Sync with central database.json configuration
+    try:
+        from backend.database import load_ai_config, save_ai_config
+        config = await load_ai_config()
+        if "telegramToken" in body:
+            config["telegramBotToken"] = body["telegramToken"]
+        if "telegramChatId" in body:
+            config["telegramChatId"] = body["telegramChatId"]
+        await save_ai_config(config)
+    except Exception as e:
+        print(f"[Sentix Adapter] Sync to main config failed: {e}")
+        
     return {"success": True}
 
 @router.get("/api/llm/settings")
@@ -377,8 +390,28 @@ async def test_notification():
     try:
         from backend.services.telegram_client import send_telegram_alert
         config = sentix_state["notificationSettings"]
-        if config.get("telegramToken") and config.get("telegramChatId"):
-            await send_telegram_alert("🔔 Test notifikasi dari Sentix AI Crypto Simulator!")
+        
+        # Trigger Telegram test alert
+        await send_telegram_alert("🔔 Test notifikasi dari Sentix AI Crypto Simulator!")
+        
+        # Also trigger email simulation if configured
+        if config.get("emailAddress"):
+            import time
+            from datetime import datetime
+            log_entry = {
+                "id": int(time.time() * 1000) + 1,
+                "timestamp": datetime.utcnow().isoformat() + "Z",
+                "type": "EMAIL",
+                "recipient": config.get("emailAddress"),
+                "message": "🔔 Test notifikasi dari Sentix AI Crypto Simulator!",
+                "status": "SIMULATED"
+            }
+            if "notificationLogs" not in sentix_state:
+                sentix_state["notificationLogs"] = []
+            sentix_state["notificationLogs"].append(log_entry)
+            sentix_state["notificationLogs"] = sentix_state["notificationLogs"][-100:]
+            _save_sentix_db()
+            
         return {"success": True, "message": "Test notifikasi dikirim."}
     except Exception as e:
         return {"success": True, "message": f"Notifikasi simulasi: {e}"}
