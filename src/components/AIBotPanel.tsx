@@ -140,9 +140,10 @@ interface BotStatusData {
 interface AIBotPanelProps {
   savedModels: MLModel[];
   llmSettings: LlmSettings;
+  active?: boolean;
 }
 
-export function AIBotPanel({ savedModels, llmSettings }: AIBotPanelProps) {
+export function AIBotPanel({ savedModels, llmSettings, active }: AIBotPanelProps) {
 const [settings, setSettings] = useState<AiBotSettings>({
     enabled: false,
     symbol: "BTCUSDT",
@@ -233,7 +234,7 @@ const [settings, setSettings] = useState<AiBotSettings>({
         setBotStatus({
           automationEnabled: data.automationEnabled,
           activeTrades: data.activeTrades || [],
-          currentConfidence: data.currentConfidence || 75,
+          currentConfidence: data.currentConfidence ?? 75,
           logs: data.logs || [],
           symbol: data.symbol || "BTCUSDT",
           currentPrices: data.currentPrices
@@ -246,6 +247,7 @@ const [settings, setSettings] = useState<AiBotSettings>({
   };
 
   useEffect(() => {
+    if (!active) return;
     fetchBotSettings();
     fetchBotStatus();
 
@@ -255,11 +257,11 @@ const [settings, setSettings] = useState<AiBotSettings>({
     }, 4000);
 
     return () => clearInterval(interval);
-  }, []);
+  }, [active]);
 
   // Uptime timer: ticks every second showing elapsed time since bot was activated
   useEffect(() => {
-    if (!botStatus.automationEnabled || !activatedAt) {
+    if (!active || !botStatus.automationEnabled || !activatedAt) {
       setUptime("00:00:00");
       return;
     }
@@ -275,7 +277,7 @@ const [settings, setSettings] = useState<AiBotSettings>({
     tick();
     const timerId = setInterval(tick, 1000);
     return () => clearInterval(timerId);
-  }, [botStatus.automationEnabled, activatedAt]);
+  }, [active, botStatus.automationEnabled, activatedAt]);
 
   const handleToggleBot = async () => {
     setIsSaving(true);

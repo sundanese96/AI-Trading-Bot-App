@@ -41,6 +41,24 @@ export default function App() {
   const [isAuthenticated, setIsAuthenticated] = useState<boolean | null>(null);
   const [activeTab, setActiveTab] = useState<"TRADING" | "NEWS" | "BACKTEST" | "ML" | "AI_BOT" | "SETTINGS" | "LIVE">("TRADING");
 
+  // Tab Visit Flags to lazy-mount tabs and keep them persistently mounted once visited
+  const [newsVisited, setNewsVisited] = useState(false);
+  const [backtestVisited, setBacktestVisited] = useState(false);
+  const [mlVisited, setMlVisited] = useState(false);
+  const [aiBotVisited, setAiBotVisited] = useState(false);
+  const [settingsVisited, setSettingsVisited] = useState(false);
+  const [liveVisited, setLiveVisited] = useState(false);
+
+  useEffect(() => {
+    if (activeTab === "NEWS") setNewsVisited(true);
+    if (activeTab === "BACKTEST") setBacktestVisited(true);
+    if (activeTab === "ML") setMlVisited(true);
+    if (activeTab === "AI_BOT") setAiBotVisited(true);
+    if (activeTab === "SETTINGS") setSettingsVisited(true);
+    if (activeTab === "LIVE") setLiveVisited(true);
+  }, [activeTab]);
+
+
   // Market & Candlestick Feed States
   const [selectedCoin, setSelectedCoin] = useState("BTCUSDT");
   const [selectedInterval, setSelectedInterval] = useState("1m");
@@ -89,7 +107,7 @@ export default function App() {
     window.fetch = async (...args) => {
       const response = await originalFetch(...args);
       if (response.status === 401) {
-        const url = typeof args[0] === "string" ? args[0] : args[0].url;
+        const url = typeof args[0] === "string" ? args[0] : ((args[0] as any).url || (args[0] as any).href || String(args[0]));
         if (url && !url.includes("/api/login") && !url.includes("/api/auth/status")) {
           setIsAuthenticated(false);
         }
@@ -629,7 +647,7 @@ export default function App() {
       {/* 3. CORE SUBPANEL VIEWS ROUTING */}
       <main className="flex-1 p-6">
         <ErrorBoundary fallbackTitle="Dashboard Utama Gagal Memuat" onReset={() => setActiveTab("TRADING")}>
-          {activeTab === "TRADING" && (
+          <div style={{ display: activeTab === "TRADING" ? "block" : "none" }}>
           <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
             {/* Left/Middle Column (Chart and Positions Table) */}
             <div className="xl:col-span-2 space-y-6">
@@ -983,53 +1001,67 @@ export default function App() {
               </div>
             </div>
           </div>
-        )}
+          </div>
 
-        {activeTab === "NEWS" && (
-          <NewsPanel
-            news={news}
-            macroEvents={macroEvents}
-            onRefreshNews={handleRefreshNewsFeed}
-            isLoading={isLoadingNews}
-          />
-        )}
+          {newsVisited && (
+            <div style={{ display: activeTab === "NEWS" ? "block" : "none" }}>
+              <NewsPanel
+                news={news}
+                macroEvents={macroEvents}
+                onRefreshNews={handleRefreshNewsFeed}
+                isLoading={isLoadingNews}
+              />
+            </div>
+          )}
 
-        {activeTab === "BACKTEST" && (
-          <BacktestPanel onRunBacktest={handleRunStrategyBacktest} />
-        )}
+          {backtestVisited && (
+            <div style={{ display: activeTab === "BACKTEST" ? "block" : "none" }}>
+              <BacktestPanel onRunBacktest={handleRunStrategyBacktest} />
+            </div>
+          )}
 
-        {activeTab === "ML" && (
-          <MLPanel
-            onTrainModel={handleTrainLocalMLModel}
-            onGetForecast={handleRequestAIForecast}
-            savedModels={mlModels}
-          />
-        )}
+          {mlVisited && (
+            <div style={{ display: activeTab === "ML" ? "block" : "none" }}>
+              <MLPanel
+                onTrainModel={handleTrainLocalMLModel}
+                onGetForecast={handleRequestAIForecast}
+                savedModels={mlModels}
+              />
+            </div>
+          )}
 
-        {activeTab === "AI_BOT" && (
-          <AIBotPanel
-            savedModels={mlModels}
-            llmSettings={llmSettings}
-          />
-        )}
+          {aiBotVisited && (
+            <div style={{ display: activeTab === "AI_BOT" ? "block" : "none" }}>
+              <AIBotPanel
+                savedModels={mlModels}
+                llmSettings={llmSettings}
+                active={activeTab === "AI_BOT"}
+              />
+            </div>
+          )}
 
-        {activeTab === "SETTINGS" && (
-          <SettingsPanel
-            settings={settings}
-            logs={notifLogs}
-            onSaveSettings={handleSaveNotificationSettings}
-            onTriggerTest={handleTriggerTestAlert}
-            llmSettings={llmSettings}
-            onSaveLlmSettings={handleSaveLlmSettings}
-          />
-        )}
+          {settingsVisited && (
+            <div style={{ display: activeTab === "SETTINGS" ? "block" : "none" }}>
+              <SettingsPanel
+                settings={settings}
+                logs={notifLogs}
+                onSaveSettings={handleSaveNotificationSettings}
+                onTriggerTest={handleTriggerTestAlert}
+                llmSettings={llmSettings}
+                onSaveLlmSettings={handleSaveLlmSettings}
+              />
+            </div>
+          )}
 
-        {activeTab === "LIVE" && (
-          <LiveTradingPanel
-            lang="ID"
-            selectedCoin={selectedCoin}
-          />
-        )}
+          {liveVisited && (
+            <div style={{ display: activeTab === "LIVE" ? "block" : "none" }}>
+              <LiveTradingPanel
+                lang="ID"
+                selectedCoin={selectedCoin}
+                active={activeTab === "LIVE"}
+              />
+            </div>
+          )}
         </ErrorBoundary>
       </main>
     </div>

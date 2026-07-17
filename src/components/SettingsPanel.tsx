@@ -594,27 +594,37 @@ export function SettingsPanel({
             </div>
           </div>
 
-          {/* Guide 2: Local LLM (Ollama) */}
+          {/* Guide 2: Local LLM (Ollama) & 9Router */}
           <div className="bg-slate-900/60 backdrop-blur-md border border-slate-800/80 rounded-2xl p-6 shadow-2xl space-y-4">
             <h4 className="font-sans font-bold text-white text-base flex items-center gap-2">
               <HelpCircle className="h-4 w-4 text-indigo-400" />
-              Panduan Model Lokal
+              Panduan Model Lokal & 9Router
             </h4>
             <div className="space-y-3 text-xs text-slate-400 leading-relaxed">
               <p>
-                Untuk menjalankan model LLM secara gratis di PC lokal menggunakan Ollama:
+                Untuk menjalankan model LLM secara gratis di PC lokal menggunakan Ollama atau eksternal via 9Router Tunnel:
               </p>
               <div className="space-y-2 bg-slate-950/40 p-3 rounded-xl border border-slate-800/40 font-mono text-[10px]">
-                <p className="text-white font-bold">Konfigurasi Ollama:</p>
+                <p className="text-white font-bold">Opsi A: Konfigurasi Ollama</p>
                 <ol className="list-decimal list-inside space-y-1.5 text-slate-400">
                   <li>Unduh Ollama di <span className="text-indigo-400">ollama.com</span>.</li>
-                  <li>Buka terminal, jalankan model favorit:
+                  <li>Jalankan model di terminal:
                     <div className="bg-slate-950 text-indigo-300 p-1.5 rounded my-1 select-all">ollama run llama3</div>
                   </li>
                   <li>Pilih provider <span className="text-indigo-400">Custom Endpoint</span> di form kiri.</li>
                   <li>Isi Base URL: <span className="text-indigo-400">http://localhost:11434/v1</span></li>
                   <li>Isi Target Model: <span className="text-indigo-400">llama3</span></li>
                   <li>Kosongkan kolom API Secret Key.</li>
+                </ol>
+              </div>
+
+              <div className="space-y-2 bg-slate-950/40 p-3 rounded-xl border border-slate-800/40 font-mono text-[10px]">
+                <p className="text-white font-bold">Opsi B: Konfigurasi 9Router (Tunnel)</p>
+                <ol className="list-decimal list-inside space-y-1.5 text-slate-400">
+                  <li>Pilih provider <span className="text-indigo-400">Custom Endpoint</span> di form kiri.</li>
+                  <li>Isi Base URL: <span className="text-indigo-400">https://rstxjf2.abc-tunnel.us/v1</span></li>
+                  <li>Isi Target Model: <span className="text-indigo-400">ag/gemini-3-flash-agent</span></li>
+                  <li>Isi API Secret Key: <span className="text-indigo-400">sk-1b1...9274</span></li>
                 </ol>
               </div>
             </div>

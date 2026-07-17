@@ -52,9 +52,10 @@ interface AccountInfo {
 interface LiveTradingPanelProps {
   lang: "ID" | "EN";
   selectedCoin: string;
+  active?: boolean;
 }
 
-export function LiveTradingPanel({ lang, selectedCoin }: LiveTradingPanelProps) {
+export function LiveTradingPanel({ lang, selectedCoin, active }: LiveTradingPanelProps) {
   const [configChecked, setConfigChecked] = useState(false);
   const [hasCredentials, setHasCredentials] = useState(false);
   
@@ -132,18 +133,20 @@ export function LiveTradingPanel({ lang, selectedCoin }: LiveTradingPanelProps) 
   };
 
   useEffect(() => {
-    checkConfig();
-  }, []);
+    if (active) {
+      checkConfig();
+    }
+  }, [active]);
 
   useEffect(() => {
-    if (hasCredentials) {
+    if (hasCredentials && active) {
       fetchLiveTradingData();
       const interval = setInterval(fetchLiveTradingData, 3000);
       return () => clearInterval(interval);
-    } else {
+    } else if (!hasCredentials) {
       setLoading(false);
     }
-  }, [hasCredentials]);
+  }, [hasCredentials, active]);
 
   // Handle Order Submit
   const handlePlaceOrder = async (e: React.FormEvent) => {
