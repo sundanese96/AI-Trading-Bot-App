@@ -19,7 +19,7 @@ import {
   Newspaper
 } from "lucide-react";
 
-type DocSection = "intro" | "setup" | "modules" | "faq";
+type DocSection = "intro" | "setup" | "modules" | "strategies" | "faq";
 
 export function DocsPanel() {
   const [activeSection, setActiveSection] = useState<DocSection>("intro");
@@ -33,6 +33,7 @@ export function DocsPanel() {
     { id: "intro", label: "Pengantar & Arsitektur", icon: BookOpen },
     { id: "setup", label: "Panduan Setup & API", icon: Key },
     { id: "modules", label: "Panduan Fitur & Modul", icon: FileText },
+    { id: "strategies", label: "Panduan Strategi Trading", icon: Sliders },
     { id: "faq", label: "FAQ & Troubleshooting", icon: HelpCircle },
   ];
 
@@ -268,6 +269,174 @@ export function DocsPanel() {
                   Mode langsung yang mensimulasikan lingkungan trading aktif. Begitu ada berita geopolitik baru atau pergerakan tren terdeteksi, sistem akan langsung mengkalkulasi sinyal secara otomatis untuk mengeksekusi transaksi.
                 </p>
               </div>
+            </div>
+          </div>
+        )}
+
+        {activeSection === "strategies" && (
+          <div className="space-y-6 animate-fadeIn font-sans text-xs">
+            <div>
+              <h3 className="font-sans font-bold text-white text-lg flex items-center gap-2 mb-2">
+                <Sliders className="h-5 w-5 text-indigo-400" />
+                Panduan Strategi Trading & Veto Gate
+              </h3>
+              <p className="text-slate-400 text-xs leading-relaxed font-sans">
+                Setiap strategi trading di KriptoSakti mengatur tingkat sensitivitas transaksi, ukuran risiko (leverage, stop loss), serta cara robot berinteraksi dengan **Veto Gate** (ML Confirmation Layer). Pahami perbedaan cara kerja setiap strategi di bawah ini sebelum mengaktifkan AI Bot.
+              </p>
+            </div>
+
+            <div className="border-t border-slate-800/60 pt-6 space-y-4">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                
+                {/* 1. Conservative */}
+                <div className="bg-slate-950/40 border border-slate-800/80 p-4 rounded-xl space-y-2">
+                  <div className="flex justify-between items-center">
+                    <span className="font-bold text-white flex items-center gap-1.5">
+                      🛡️ CONSERVATIVE
+                    </span>
+                    <span className="px-2 py-0.5 rounded-full text-[10px] font-mono font-bold bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
+                      VETO: ACTIVE
+                    </span>
+                  </div>
+                  <p className="text-slate-400 text-[11px] leading-relaxed">
+                    Mengutamakan keamanan dana maksimal. AI Bot hanya akan membuka posisi jika LLM (analisis berita) dan Model ML Lokal (analisis teknikal) menyepakati arah tren yang sama. Transaksi langsung dibatalkan (HOLD) oleh Veto Gate jika terjadi anomali atau ketiadaan konfirmasi terarah.
+                  </p>
+                </div>
+
+                {/* 2. Scalping */}
+                <div className="bg-slate-950/40 border border-slate-800/80 p-4 rounded-xl space-y-2">
+                  <div className="flex justify-between items-center">
+                    <span className="font-bold text-white flex items-center gap-1.5">
+                      ⚡ SCALPING
+                    </span>
+                    <span className="px-2 py-0.5 rounded-full text-[10px] font-mono font-bold bg-amber-500/10 text-amber-400 border border-amber-500/20">
+                      VETO: BYPASS
+                    </span>
+                  </div>
+                  <p className="text-slate-400 text-[11px] leading-relaxed">
+                    Mengejar keuntungan mikro dari pergerakan harga jangka pendek yang cepat. Sinyal LLM langsung dieksekusi tanpa menunggu konfirmasi dari model ML ataupun OOD Guard. Dilengkapi dengan target Stop Loss dan Take Profit yang sangat ketat untuk meminimalkan drawdown.
+                  </p>
+                </div>
+
+                {/* 3. Swing */}
+                <div className="bg-slate-950/40 border border-slate-800/80 p-4 rounded-xl space-y-2">
+                  <div className="flex justify-between items-center">
+                    <span className="font-bold text-white flex items-center gap-1.5">
+                      📈 SWING
+                    </span>
+                    <span className="px-2 py-0.5 rounded-full text-[10px] font-mono font-bold bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
+                      VETO: ACTIVE
+                    </span>
+                  </div>
+                  <p className="text-slate-400 text-[11px] leading-relaxed">
+                    Mencari pergerakan tren pasar jangka menengah hingga panjang. Memerlukan konfirmasi Veto Gate untuk memfilter anomali pasar saat pembukaan posisi, lalu menahan posisi (holding) dalam waktu lebih lama dengan target profit (Take Profit) yang relatif lebar.
+                  </p>
+                </div>
+
+                {/* 4. Aggressive */}
+                <div className="bg-slate-950/40 border border-slate-800/80 p-4 rounded-xl space-y-2">
+                  <div className="flex justify-between items-center">
+                    <span className="font-bold text-white flex items-center gap-1.5">
+                      🔥 AGGRESSIVE
+                    </span>
+                    <span className="px-2 py-0.5 rounded-full text-[10px] font-mono font-bold bg-amber-500/10 text-amber-400 border border-amber-500/20">
+                      VETO: BYPASS
+                    </span>
+                  </div>
+                  <p className="text-slate-400 text-[11px] leading-relaxed">
+                    Sensitivitas tinggi terhadap sentimen pasar dengan pemanfaatan leverage tinggi. Begitu LLM mendeteksi berita potensial, posisi langsung dibuka tanpa filter Veto Gate/OOD Guard untuk memaksimalkan tangkapan profit cepat. Sangat berisiko tinggi terhadap likuidasi.
+                  </p>
+                </div>
+
+                {/* 5. Martingale */}
+                <div className="bg-slate-950/40 border border-slate-800/80 p-4 rounded-xl space-y-2">
+                  <div className="flex justify-between items-center">
+                    <span className="font-bold text-white flex items-center gap-1.5">
+                      🔄 MARTINGALE
+                    </span>
+                    <span className="px-2 py-0.5 rounded-full text-[10px] font-mono font-bold bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
+                      VETO: ACTIVE
+                    </span>
+                  </div>
+                  <p className="text-slate-400 text-[11px] leading-relaxed">
+                    Menerapkan strategi penggandaan ukuran posisi (averaging down) saat pasar bergerak berlawanan arah dengan prediksi awal. Veto Gate tetap diaktifkan untuk mencegah pembukaan posisi baru ketika pasar terdeteksi mengalami anomali harga ekstrem atau di luar batas wajar (OOD).
+                  </p>
+                </div>
+
+                {/* 6. Hedging */}
+                <div className="bg-slate-950/40 border border-slate-800/80 p-4 rounded-xl space-y-2">
+                  <div className="flex justify-between items-center">
+                    <span className="font-bold text-white flex items-center gap-1.5">
+                      🔒 HEDGING
+                    </span>
+                    <span className="px-2 py-0.5 rounded-full text-[10px] font-mono font-bold bg-amber-500/10 text-amber-400 border border-amber-500/20">
+                      VETO: BYPASS
+                    </span>
+                  </div>
+                  <p className="text-slate-400 text-[11px] leading-relaxed">
+                    Membuka posisi pelindung dua arah (LONG & SHORT secara bersamaan) untuk mengamankan nilai portofolio saat pasar tidak menentu. Veto Gate dilewati agar robot dapat merespon pergerakan sentimen berita secara instan dan membuka posisi pelindung secara langsung.
+                  </p>
+                </div>
+
+              </div>
+
+              {/* Summary Table */}
+              <div className="bg-slate-950/60 border border-slate-800/80 rounded-xl p-4 space-y-3">
+                <h4 className="font-bold text-white text-[11px] uppercase tracking-wider font-mono">
+                  Matriks Perbandingan Strategi & Veto Gate
+                </h4>
+                <div className="overflow-x-auto">
+                  <table className="w-full text-[10px] font-mono text-slate-300 border-collapse">
+                    <thead>
+                      <tr className="border-b border-slate-800 text-slate-400 text-left">
+                        <th className="py-2 pr-4">Nama Strategi</th>
+                        <th className="py-2 px-4">ML Veto Gate</th>
+                        <th className="py-2 px-4">Leverage Profile</th>
+                        <th className="py-2 px-4">TP / SL Ratio</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-850">
+                      <tr>
+                        <td className="py-2 pr-4 font-bold text-white">CONSERVATIVE</td>
+                        <td className="py-2 px-4 text-emerald-400 font-bold">🛡️ AKTIF</td>
+                        <td className="py-2 px-4">Rendah (3x - 5x)</td>
+                        <td className="py-2 px-4">Standar (2:1)</td>
+                      </tr>
+                      <tr>
+                        <td className="py-2 pr-4 font-bold text-white">SCALPING</td>
+                        <td className="py-2 px-4 text-amber-400 font-bold">⚡ BYPASS</td>
+                        <td className="py-2 px-4">Sedang (5x - 10x)</td>
+                        <td className="py-2 px-4">Sangat Ketat</td>
+                      </tr>
+                      <tr>
+                        <td className="py-2 pr-4 font-bold text-white">SWING</td>
+                        <td className="py-2 px-4 text-emerald-400 font-bold">🛡️ AKTIF</td>
+                        <td className="py-2 px-4">Sedang (5x)</td>
+                        <td className="py-2 px-4">Lebar (3:1)</td>
+                      </tr>
+                      <tr>
+                        <td className="py-2 pr-4 font-bold text-white">AGGRESSIVE</td>
+                        <td className="py-2 px-4 text-amber-400 font-bold">⚡ BYPASS</td>
+                        <td className="py-2 px-4">Tinggi (10x - 20x)</td>
+                        <td className="py-2 px-4">Lebar (Agresif)</td>
+                      </tr>
+                      <tr>
+                        <td className="py-2 pr-4 font-bold text-white">MARTINGALE</td>
+                        <td className="py-2 px-4 text-emerald-400 font-bold">🛡️ AKTIF</td>
+                        <td className="py-2 px-4">Dinamis (Bertingkat)</td>
+                        <td className="py-2 px-4">Target Rebound</td>
+                      </tr>
+                      <tr>
+                        <td className="py-2 pr-4 font-bold text-white">HEDGING</td>
+                        <td className="py-2 px-4 text-amber-400 font-bold">⚡ BYPASS</td>
+                        <td className="py-2 px-4">Sedang (5x)</td>
+                        <td className="py-2 px-4">Dua Arah (Neutral)</td>
+                      </tr>
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+
             </div>
           </div>
         )}
