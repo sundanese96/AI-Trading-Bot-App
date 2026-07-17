@@ -1623,12 +1623,17 @@ Gunakan data real-time, volatilitas pasar, sentimen berita, indeks Fear & Greed,
         meta_evaluated = False
 
         if llm_decision in ["LONG", "SHORT"]:
+            strategy_name = bot_settings.get("strategy", "CONSERVATIVE").upper()
+            bypass_veto = strategy_name in ["AGGRESSIVE", "SCALPING", "HEDGING"]
+
             if target_asset not in crypto_assets:
-                print(f"[Veto Gate] Asset {target_asset} not supported by ML pipeline — forcing HOLD for safety")
+                print(f"[Veto Gate] Asset {target_asset} not supported by ML pipeline")
                 veto_active = True
                 veto_reason = f"Asset {target_asset} not supported by ML pipeline — forcing HOLD for safety"
-                ai_decision["decision"] = "HOLD"
-                parsed_analysis["tradeDecision"] = ai_decision
+                if not bypass_veto:
+                    print(f"[Veto Gate] Forcing HOLD for safety")
+                    ai_decision["decision"] = "HOLD"
+                    parsed_analysis["tradeDecision"] = ai_decision
             else:
                 try:
                     from backend.services.ml.inference import fetch_recent_candles, predict_live_with_gate
@@ -1654,11 +1659,13 @@ Gunakan data real-time, volatilitas pasar, sentimen berita, indeks Fear & Greed,
                     veto_thresh = 0.35
                     
                     if is_ood:
-                        print(f"[Veto Gate] OOD Guard active. Market anomaly detected. Overriding LLM decision to HOLD out of caution.")
+                        print(f"[Veto Gate] OOD Guard active. Market anomaly detected.")
                         veto_active = True
                         veto_reason = f"OOD Guard Active ({len(ood_violations)} violations) - conservative HOLD triggered."
-                        ai_decision["decision"] = "HOLD"
-                        parsed_analysis["tradeDecision"] = ai_decision
+                        if not bypass_veto:
+                            print(f"[Veto Gate] Overriding LLM decision to HOLD out of caution.")
+                            ai_decision["decision"] = "HOLD"
+                            parsed_analysis["tradeDecision"] = ai_decision
                     else:
                         if llm_decision == "LONG" and ml_prediction == -1 and ml_confidence >= veto_thresh:
                             veto_active = True
@@ -1670,18 +1677,24 @@ Gunakan data real-time, volatilitas pasar, sentimen berita, indeks Fear & Greed,
                             veto_active = True
                             veto_reason = "ML Neutral - No Directional Confirmation"
                         if veto_active and not is_ood:
-                            print(f"[Veto Gate] VETO TRIGGERED! Reason: {veto_reason}. Overriding LLM decision {llm_decision} to HOLD.")
-                            ai_decision["decision"] = "HOLD"
-                            parsed_analysis["tradeDecision"] = ai_decision
+                            print(f"[Veto Gate] VETO TRIGGERED! Reason: {veto_reason}.")
+                            if not bypass_veto:
+                                print(f"[Veto Gate] Overriding LLM decision {llm_decision} to HOLD.")
+                                ai_decision["decision"] = "HOLD"
+                                parsed_analysis["tradeDecision"] = ai_decision
+                            else:
+                                print(f"[Veto Gate] Strategy is {strategy_name} — bypassing veto override.")
                 except Exception as ml_err:
-                    print(f"[Veto Gate] Error running ML confirmation/veto gate: {ml_err}. Forcing HOLD for safety.")
+                    print(f"[Veto Gate] Error running ML confirmation/veto gate: {ml_err}.")
                     veto_active = True
                     veto_reason = f"ML gate error: {str(ml_err)}"
                     meta_p_win = None
                     meta_approved = False
                     meta_evaluated = False
-                    ai_decision["decision"] = "HOLD"
-                    parsed_analysis["tradeDecision"] = ai_decision
+                    if not bypass_veto:
+                        print(f"[Veto Gate] Forcing HOLD for safety.")
+                        ai_decision["decision"] = "HOLD"
+                        parsed_analysis["tradeDecision"] = ai_decision
                 
         # Expose gate debug/audit fields back in parsed_analysis
         parsed_analysis["vetoGate"] = {
