@@ -108,7 +108,8 @@ async def update_fear_and_greed_index():
             if response.status_code == 200:
                 data = response.json()
                 if data and data.get("data") and len(data["data"]) > 0:
-                    fng_cache = data["data"][0]
+                    fng_cache.clear()
+                    fng_cache.update(data["data"][0])
                     print(f"[FNG API] Updated index value: {fng_cache['value']} ({fng_cache['value_classification']})")
                     return
     except Exception as e:
@@ -130,12 +131,13 @@ async def update_fear_and_greed_index():
     else:
         classification = "Extreme Greed"
     
-    fng_cache = {
+    fng_cache.clear()
+    fng_cache.update({
         "value": str(new_val),
         "value_classification": classification,
         "timestamp": str(int(time.time())),
         "time_until_update": str(max(0, int(fng_cache.get("time_until_update", "24000")) - 60))
-    }
+    })
 
 async def market_simulation_loop():
     global assets, current_panic
@@ -196,7 +198,8 @@ async def market_simulation_loop():
                     "history": history
                 })
             
-            assets = new_assets
+            assets.clear()
+            assets.extend(new_assets)
             
             if current_panic["active"]:
                 current_panic["timeLeft"] -= 1.5

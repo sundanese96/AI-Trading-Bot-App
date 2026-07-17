@@ -18,6 +18,7 @@ import {
   ShieldAlert,
   Bot,
   Activity,
+  LogOut,
 } from "lucide-react";
 
 import { PortfolioData, TradePosition, NewsArticle, MacroEvent, MLModel, NotificationSettings, NotificationLog, Candlestick, BacktestParams, LlmSettings } from "./types";
@@ -33,9 +34,11 @@ import { CryptoTicker } from "./components/CryptoTicker";
 
 
 import { LiveTradingPanel } from "./components/live_trading/LiveTradingPanel";
+import { LoginScreen } from "./components/LoginScreen";
 
 
 export default function App() {
+  const [isAuthenticated, setIsAuthenticated] = useState<boolean | null>(null);
   const [activeTab, setActiveTab] = useState<"TRADING" | "NEWS" | "BACKTEST" | "ML" | "AI_BOT" | "SETTINGS" | "LIVE">("TRADING");
 
   // Market & Candlestick Feed States
@@ -78,6 +81,41 @@ export default function App() {
   const [orderFeedback, setOrderFeedback] = useState({ text: "", isError: false });
 
   const [isLoadingNews, setIsLoadingNews] = useState(false);
+
+  // Check session status on mount and intercept fetch requests for 401 redirection
+  useEffect(() => {
+    // Intercept fetch to redirect on 401 Unauthorized globally
+    const originalFetch = window.fetch;
+    window.fetch = async (...args) => {
+      const response = await originalFetch(...args);
+      if (response.status === 401) {
+        const url = typeof args[0] === "string" ? args[0] : args[0].url;
+        if (url && !url.includes("/api/login") && !url.includes("/api/auth/status")) {
+          setIsAuthenticated(false);
+        }
+      }
+      return response;
+    };
+
+    const checkAuthStatus = async () => {
+      try {
+        const res = await fetch("/api/auth/status");
+        if (res.ok) {
+          const data = await res.json();
+          setIsAuthenticated(!!data.authenticated);
+        } else {
+          setIsAuthenticated(false);
+        }
+      } catch (err) {
+        setIsAuthenticated(false);
+      }
+    };
+    checkAuthStatus();
+
+    return () => {
+      window.fetch = originalFetch;
+    };
+  }, []);
 
   // Synchronize Backend Wallet Balance, Active Trades, News Logs, and Notification setups
   const fetchBackendState = useCallback(async () => {
@@ -149,6 +187,7 @@ export default function App() {
 
   // Periodic Polling synchronization loops
   useEffect(() => {
+    if (isAuthenticated !== true) return;
     fetchBackendState();
     fetchBinanceCandles();
 
@@ -166,10 +205,11 @@ export default function App() {
       clearInterval(fastSync);
       clearInterval(candleSync);
     };
-  }, [fetchBackendState, fetchBinanceCandles]);
+  }, [isAuthenticated, fetchBackendState, fetchBinanceCandles]);
 
   // Sync news logs once on mount
   useEffect(() => {
+    if (isAuthenticated !== true) return;
     const fetchNews = async () => {
       try {
         const response = await fetch("/api/news");
@@ -185,7 +225,7 @@ export default function App() {
       }
     };
     fetchNews();
-  }, []);
+  }, [isAuthenticated]);
 
   // Handler: Execute new simulated trading position
   const handleExecuteOrder = async (e: React.FormEvent) => {
@@ -358,6 +398,18 @@ export default function App() {
     return false;
   };
 
+  // Handler: Logout Session
+  const handleLogout = async () => {
+    if (window.confirm("Apakah Anda yakin ingin keluar dari terminal?")) {
+      try {
+        await fetch("/api/logout", { method: "POST" });
+      } catch (err) {
+        console.error("Gagal logout:", err);
+      }
+      setIsAuthenticated(false);
+    }
+  };
+
   // Handler: Reset Account Balance
   const handleResetPortfolio = async () => {
     if (window.confirm("Apakah Anda yakin ingin mengatur ulang portofolio kembali ke saldo demo awal $100.000 USD? Semua riwayat posisi akan dibersihkan.")) {
@@ -397,6 +449,22 @@ export default function App() {
 
   const accountNetWorthUSD = portfolio.balanceUSD + totalUnrealizedPnlUSD;
   const netWorthReturnPct = ((accountNetWorthUSD - portfolio.initialBalance) / portfolio.initialBalance) * 100;
+
+  if (isAuthenticated === null) {
+    return (
+      <div className="min-h-screen bg-slate-950 flex items-center justify-center flex-col gap-4 font-sans text-slate-200">
+        <div className="relative w-12 h-12">
+          <div className="absolute inset-0 rounded-full border-4 border-slate-800"></div>
+          <div className="absolute inset-0 rounded-full border-4 border-t-indigo-500 animate-spin"></div>
+        </div>
+        <p className="text-sm font-medium tracking-wider text-slate-400 animate-pulse">Memeriksa Sesi...</p>
+      </div>
+    );
+  }
+
+  if (isAuthenticated === false) {
+    return <LoginScreen onLoginSuccess={() => setIsAuthenticated(true)} />;
+  }
 
   return (
     <div className="min-h-screen bg-slate-950 text-slate-100 flex flex-col selection:bg-indigo-500/35 selection:text-white">
@@ -477,12 +545,20 @@ export default function App() {
           </div>
 
           {/* Reset / Controls */}
-          <button
-            onClick={handleResetPortfolio}
-            className="text-[10px] font-mono bg-red-950/20 border border-red-900/30 hover:border-red-500 hover:text-white text-red-400 px-3 py-1.5 rounded-lg transition active:scale-95 cursor-pointer"
-          >
-            Reset Demo Wallet
-          </button>
+          <div className="flex gap-2">
+            <button
+              onClick={handleResetPortfolio}
+              className="text-[10px] font-mono bg-red-950/20 border border-red-900/30 hover:border-red-500 hover:text-white text-red-400 px-3 py-1.5 rounded-lg transition active:scale-95 cursor-pointer"
+            >
+              Reset Demo Wallet
+            </button>
+            <button
+              onClick={handleLogout}
+              className="flex items-center gap-1.5 text-[10px] font-mono bg-slate-900/60 border border-slate-800 hover:border-slate-650 hover:border-slate-500 hover:text-white text-slate-400 px-3 py-1.5 rounded-lg transition active:scale-95 cursor-pointer"
+            >
+              <LogOut className="h-3 w-3" /> Keluar
+            </button>
+          </div>
         </nav>
 
         {/* 1.5. LIVE CRYPTO TICKER (MODULAR) */}

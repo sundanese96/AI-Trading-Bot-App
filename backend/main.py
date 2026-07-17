@@ -4,14 +4,14 @@ import asyncio
 # Force reload trigger comment
 
 from fastapi import FastAPI, Request, HTTPException, BackgroundTasks
-from fastapi.responses import FileResponse
+from fastapi.responses import FileResponse, Response, JSONResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.middleware.cors import CORSMiddleware
 from contextlib import asynccontextmanager
 from pydantic import BaseModel
 from typing import Optional, List, Dict, Any
 
-from backend.config import GEMINI_API_KEY, OPENAI_API_KEY, ANTHROPIC_API_KEY, CUSTOM_AI_KEY, PORT, HOST
+from backend.config import GEMINI_API_KEY, OPENAI_API_KEY, ANTHROPIC_API_KEY, CUSTOM_AI_KEY, PORT, HOST, DASHBOARD_USERNAME, DASHBOARD_PASSWORD
 from backend.database import read_database, write_database
 from backend.services import db_manager
 from backend.services.historical_scraper import scrape_google_news_historical
@@ -102,6 +102,8 @@ async def trigger_automated_trade_sim(item: Dict[str, Any], config: Dict[str, An
                     "impact": impact,
                     "source": source,
                     "details": f"Scraped from {source}. Sentiment score: {score}. Bypassed AI Bot Trade Analysis.",
+                    "forecast": item.get("forecast", ""),
+                    "previous": item.get("previous", ""),
                     "isTriggeredShort": is_geo or is_macro,
                     "isTriggeredGold": is_geo,
                     "summaryId": f"Scraped news. Category: {category}. Bypassed AI Bot."
@@ -126,7 +128,9 @@ async def trigger_automated_trade_sim(item: Dict[str, Any], config: Dict[str, An
             customUrl=config.get("customUrl", ""),
             customKey=config.get("customKey", ""),
             customModel=config.get("customModel", ""),
-            targetAsset=active_asset
+            targetAsset=active_asset,
+            forecast=item.get("forecast", ""),
+            previous=item.get("previous", "")
         )
         
         analysis_res = await analyze_ai(req)
@@ -576,6 +580,8 @@ async def news_scraper_loop():
                         "impact": impact,
                         "source": item["source"],
                         "details": f"Scraped from {item['source']}. Sentiment score: {score}.",
+                        "forecast": item.get("forecast", ""),
+                        "previous": item.get("previous", ""),
                         "isTriggeredShort": is_geo or is_macro,
                         "isTriggeredGold": is_geo,
                         "summaryId": f"Scraped news. Category: {category}. Short signal: {'ACTIVE' if (is_geo or is_macro) else 'INACTIVE'}."
@@ -624,6 +630,94 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+@app.middleware("http")
+async def add_cache_control_header(request: Request, call_next):
+    response = await call_next(request)
+    if request.url.path.startswith("/api"):
+        response.headers["Cache-Control"] = "no-cache, no-store, must-revalidate"
+        response.headers["Pragma"] = "no-cache"
+        response.headers["Expires"] = "0"
+    return response
+
+# Persistent Session Management
+SESSION_FILE = "/home/x/AI-Trading-Bot-App/.session_token"
+
+def get_active_session_id():
+    import os
+    if os.path.exists(SESSION_FILE):
+        try:
+            with open(SESSION_FILE, "r") as f:
+                return f.read().strip()
+        except Exception:
+            return None
+    return None
+
+def set_active_session_id(session_id: str):
+    try:
+        with open(SESSION_FILE, "w") as f:
+            f.write(session_id)
+    except Exception as e:
+        print(f"Error saving session token: {e}")
+
+def clear_active_session_id():
+    import os
+    if os.path.exists(SESSION_FILE):
+        try:
+            os.remove(SESSION_FILE)
+        except Exception as e:
+            print(f"Error removing session token: {e}")
+
+class LoginRequest(BaseModel):
+    username: str
+    password: str
+
+@app.middleware("http")
+async def auth_middleware(request: Request, call_next):
+    path = request.url.path
+    
+    if path.startswith("/api"):
+        if path not in ["/api/login", "/api/auth/status"]:
+            session_id = request.cookies.get("session_id")
+            active_id = get_active_session_id()
+            if not session_id or session_id != active_id:
+                from fastapi.responses import JSONResponse
+                return JSONResponse(status_code=401, content={"detail": "Unauthorized"})
+                
+    response = await call_next(request)
+    return response
+
+@app.post("/api/login")
+async def login(data: LoginRequest, response: Response):
+    if data.username == DASHBOARD_USERNAME and data.password == DASHBOARD_PASSWORD:
+        import uuid
+        session_id = uuid.uuid4().hex
+        set_active_session_id(session_id)
+        response.set_cookie(
+            key="session_id",
+            value=session_id,
+            httponly=True,
+            samesite="lax",
+            max_age=3600 * 24 * 7, # 7 days
+            path="/"
+        )
+        return {"success": True}
+    else:
+        raise HTTPException(status_code=400, detail="Username atau password salah")
+
+@app.get("/api/auth/status")
+async def auth_status(request: Request):
+    session_id = request.cookies.get("session_id")
+    active_id = get_active_session_id()
+    if session_id and session_id == active_id:
+        return {"authenticated": True}
+    return {"authenticated": False}
+
+@app.post("/api/logout")
+async def logout(response: Response):
+    clear_active_session_id()
+    response.delete_cookie(key="session_id", path="/")
+    return {"success": True}
+
 # Register Sentix UI compatibility adapter routes (takes priority)
 from backend.sentix_adapter import router as sentix_router
 app.include_router(sentix_router)
@@ -649,6 +743,8 @@ class AIAnalyzeRequest(BaseModel):
     customModel: Optional[str] = None
     temperature: Optional[float] = None
     targetAsset: Optional[str] = None
+    forecast: Optional[str] = ""
+    previous: Optional[str] = ""
 
 class EvaluateRequest(BaseModel):
     headline: str
@@ -1045,6 +1141,8 @@ async def analyze_ai(req: AIAnalyzeRequest):
             "impact": "CRITICAL" if (is_geopolitical or is_macro) else "NEUTRAL",
             "source": req.source or "User Live Input",
             "details": f"Hasil analisis mendalam: {analysis_summary}",
+            "forecast": getattr(req, "forecast", ""),
+            "previous": getattr(req, "previous", ""),
             "isTriggeredShort": is_geopolitical or is_macro,
             "isTriggeredGold": is_geopolitical,
             "summaryId": f"Deviasi Terdeteksi! Kategori: {'Geopolitik' if is_geopolitical else 'Makro' if is_macro else 'Umum'}. Sinyal short kripto: {'AKTIF' if (is_geopolitical or is_macro) else 'NON-AKTIF'}."
@@ -2413,4 +2511,6 @@ if os.path.exists(dist_dir):
 if __name__ == "__main__":
     import uvicorn
     import asyncio
-    uvicorn.run("backend.main:app", host=HOST, port=PORT, reload=True, log_level="warning")
+    import os
+    should_reload = os.getenv("RELOAD", "false").lower() == "true"
+    uvicorn.run("backend.main:app", host=HOST, port=PORT, reload=should_reload, log_level="warning")

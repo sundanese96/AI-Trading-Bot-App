@@ -19,7 +19,7 @@ export function CryptoTicker({ onSelectCoin, selectedCoin }: CryptoTickerProps) 
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(false);
   const [lastUpdated, setLastUpdated] = useState<string>("");
-  const [prevPrices, setPrevPrices] = useState<{ [symbol: string]: number }>({});
+  const prevPricesRef = useRef<{ [symbol: string]: number }>({});
   const [priceFlash, setPriceFlash] = useState<{ [symbol: string]: "up" | "down" | null }>({});
   const [fng, setFng] = useState<{ value: string; value_classification: string } | null>(null);
   const flashTimeouts = useRef<{ [symbol: string]: NodeJS.Timeout }>({});
@@ -49,7 +49,7 @@ export function CryptoTicker({ onSelectCoin, selectedCoin }: CryptoTickerProps) 
 
         newAssetsList.forEach((asset) => {
           const sym = asset.symbol;
-          const prevPrice = prevPrices[sym];
+          const prevPrice = prevPricesRef.current[sym];
           if (prevPrice !== undefined && prevPrice !== asset.price) {
             newFlashes[sym] = asset.price > prevPrice ? "up" : "down";
             priceChanged = true;
@@ -75,7 +75,7 @@ export function CryptoTicker({ onSelectCoin, selectedCoin }: CryptoTickerProps) 
         newAssetsList.forEach((a) => {
           priceMap[a.symbol] = a.price;
         });
-        setPrevPrices(priceMap);
+        prevPricesRef.current = priceMap;
 
         setAssets(newAssetsList);
         setError(false);
@@ -102,7 +102,7 @@ export function CryptoTicker({ onSelectCoin, selectedCoin }: CryptoTickerProps) 
       // Clean up any pending timeouts
       Object.values(flashTimeouts.current).forEach(clearTimeout);
     };
-  }, [prevPrices]);
+  }, []);
 
   // Translate symbol for app selection
   const handleCardClick = (symbol: string) => {

@@ -83,3 +83,8 @@ database.json
 # Force git to track the trained models and reports inside backend/models
 !backend/models/
 !backend/models/**
+
+# Session tokens and logs
+.session_token
+*.log
+

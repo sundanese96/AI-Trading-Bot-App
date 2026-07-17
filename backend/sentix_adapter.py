@@ -214,7 +214,20 @@ async def get_news():
                 "impactFactor": item.get("impact", "NEUTRAL"),
                 "timestamp": int(time.time() * 1000)
             })
-        return {"success": True, "news": sentix_news, "macroEvents": sentix_state.get("macroEvents", [])}
+        macro_events = []
+        for item in news_feed:
+            if item.get("category") == "MACRO":
+                macro_events.append({
+                    "id": item.get("id", f"macro-{item.get('time', '')}"),
+                    "title": item.get("headline", ""),
+                    "country": "Global",
+                    "date": "Hari Ini",
+                    "time": item.get("time", ""),
+                    "impact": item.get("impact", "Medium"),
+                    "forecast": item.get("forecast", ""),
+                    "previous": item.get("previous", "")
+                })
+        return {"success": True, "news": sentix_news, "macroEvents": macro_events}
     except Exception:
         return {"success": True, "news": [], "macroEvents": []}
 
@@ -665,10 +678,22 @@ async def gemini_forecast(request: Request):
 @router.post("/api/backtest")
 async def run_backtest(request: Request):
     body = await request.json()
-    # Simple backtest stub using existing logic
+    start_bal = body.get("startingBalance", 10000)
+    # Return a complete mock BacktestResult so frontend doesn't crash
     return {"success": True, "report": {
-        "totalTrades": 0, "winRate": 0, "profitFactor": 0,
-        "message": "Backtest engine sedang dalam migrasi ke pipeline kuantitatif baru."
+        "params": body,
+        "initialBalance": start_bal,
+        "finalBalance": start_bal,
+        "totalProfitUSD": 0,
+        "totalProfitPct": 0,
+        "totalTrades": 0,
+        "winningTrades": 0,
+        "winRate": 0,
+        "maxDrawdown": 0,
+        "profitFactor": 0,
+        "trades": [],
+        "equityCurve": [{"time": "Sekarang", "balance": start_bal, "price": 0}],
+        "message": "Fitur Backtester engine sedang dalam migrasi ke pipeline kuantitatif baru."
     }}
 
 @router.post("/api/system/reset")

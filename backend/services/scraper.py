@@ -71,7 +71,7 @@ async def fetch_forexfactory_calendar() -> List[Dict[str, Any]]:
     Fetches and parses the official ForexFactory weekly calendar XML feed.
     This is highly accurate and free.
     """
-    url = "https://www.forexfactory.com/ffcal_week_this.xml"
+    url = "https://nfs.faireconomy.media/ff_calendar_thisweek.json"
     headers = {
         "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
     }
@@ -80,18 +80,19 @@ async def fetch_forexfactory_calendar() -> List[Dict[str, Any]]:
         async with httpx.AsyncClient(verify=False) as client:
             response = await client.get(url, headers=headers, timeout=10.0)
             if response.status_code == 200:
-                root = ET.fromstring(response.content)
-                for event in root.findall("event"):
-                    title = event.find("title").text if event.find("title") is not None else ""
-                    country = event.find("country").text if event.find("country") is not None else ""
-                    impact = event.find("impact").text if event.find("impact") is not None else ""
+                events = response.json()
+                for event in events:
+                    title = event.get("title", "")
+                    country = event.get("country", "")
+                    impact = event.get("impact", "")
                     
-                    # Filter high impact (Red Folder) or medium impact events
                     if impact in ["High", "Medium"] and country in ["USD", "EUR", "GBP"]:
                         news_items.append({
                             "title": f"FF CALENDAR: {country} - {title} ({impact} Impact)",
                             "url": "https://www.forexfactory.com/calendar",
-                            "source": "ForexFactory Calendar"
+                            "source": "ForexFactory Calendar",
+                            "forecast": event.get("forecast", ""),
+                            "previous": event.get("previous", "")
                         })
     except Exception as e:
         print(f"[Scraper] Failed to fetch ForexFactory calendar: {e}")
