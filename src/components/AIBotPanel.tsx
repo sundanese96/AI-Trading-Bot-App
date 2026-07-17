@@ -182,33 +182,36 @@ const [settings, setSettings] = useState<AiBotSettings>({
   const [uptime, setUptime] = useState<string>("00:00:00");
   const [selectedTrade, setSelectedTrade] = useState<any | null>(null);
   const [isClosingTrade, setIsClosingTrade] = useState<boolean>(false);
+  const [confirmCloseId, setConfirmCloseId] = useState<string | null>(null);
 
   const handleClosePosition = async (tradeId: string) => {
-    if (!window.confirm("Apakah Anda yakin ingin menutup posisi ini secara manual?")) return;
+    console.log("[AIBot] handleClosePosition called with tradeId:", tradeId);
     setIsClosingTrade(true);
+    setStatusMsg({ text: "", isError: false });
     try {
+      console.log("[AIBot] Sending POST /api/trade/close ...");
       const response = await fetch("/api/trade/close", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ tradeId })
       });
-      if (response.ok) {
-        const resData = await response.json();
-        if (resData.success) {
-          setStatusMsg({ text: "✅ Posisi berhasil ditutup secara manual.", isError: false });
-          setSelectedTrade(null);
-          fetchBotStatus();
-        } else {
-          throw new Error(resData.message || "Gagal menutup posisi.");
-        }
+      console.log("[AIBot] Response status:", response.status);
+      const resData = await response.json();
+      console.log("[AIBot] Response data:", resData);
+      if (response.ok && resData.success) {
+        setStatusMsg({ text: "✅ Posisi berhasil ditutup secara manual.", isError: false });
+        setSelectedTrade(null);
+        setConfirmCloseId(null);
+        fetchBotStatus();
       } else {
-        const errData = await response.json();
-        throw new Error(errData.message || "Gagal menutup posisi.");
+        setStatusMsg({ text: `❌ ${resData.message || "Gagal menutup posisi."}`, isError: true });
       }
     } catch (e: any) {
-      alert("Error: " + e.message);
+      console.error("[AIBot] Close position error:", e);
+      setStatusMsg({ text: `❌ Error: ${e.message}`, isError: true });
     } finally {
       setIsClosingTrade(false);
+      setConfirmCloseId(null);
     }
   };
 
@@ -1100,8 +1103,8 @@ const [settings, setSettings] = useState<AiBotSettings>({
 
       {/* Detail Posisi Modal */}
       {selectedTrade && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/80 backdrop-blur-sm p-4 animate-fadeIn">
-          <div className="bg-slate-900 border border-slate-800 rounded-2xl max-w-md w-full overflow-hidden shadow-2xl">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/80 backdrop-blur-sm p-4 animate-fadeIn" onClick={() => { setSelectedTrade(null); setConfirmCloseId(null); }}>
+          <div className="bg-slate-900 border border-slate-800 rounded-2xl max-w-md w-full overflow-hidden shadow-2xl" onClick={(e) => e.stopPropagation()}>
             {/* Modal Header */}
             <div className="flex justify-between items-center px-6 py-4 border-b border-slate-800/80 bg-slate-950/40">
               <div className="flex items-center gap-2">
@@ -1209,19 +1212,40 @@ const [settings, setSettings] = useState<AiBotSettings>({
 
             {/* Modal Actions */}
             <div className="flex gap-3 px-6 py-4 bg-slate-950/40 border-t border-slate-800/80">
-              <button
-                onClick={() => handleClosePosition(selectedTrade.id)}
-                disabled={isClosingTrade}
-                className="flex-1 bg-rose-600 hover:bg-rose-700 text-white font-bold py-2 rounded-xl active:scale-[0.98] transition cursor-pointer disabled:opacity-50 text-[11px] font-mono text-center"
-              >
-                {isClosingTrade ? "Menutup Posisi..." : "Tutup Posisi Sekarang"}
-              </button>
-              <button
-                onClick={() => setSelectedTrade(null)}
-                className="px-4 py-2 border border-slate-800 hover:bg-slate-800 text-slate-300 hover:text-white font-semibold rounded-xl text-[11px] font-mono transition cursor-pointer"
-              >
-                Batal
-              </button>
+              {confirmCloseId === selectedTrade.id ? (
+                <>
+                  <button
+                    onClick={(e) => { e.stopPropagation(); handleClosePosition(selectedTrade.id); }}
+                    disabled={isClosingTrade}
+                    className="flex-1 bg-red-700 hover:bg-red-800 text-white font-bold py-2.5 rounded-xl active:scale-[0.98] transition cursor-pointer disabled:opacity-50 text-[11px] font-mono text-center animate-pulse"
+                  >
+                    {isClosingTrade ? "⏳ Menutup Posisi..." : "⚠️ KONFIRMASI: Ya, Tutup Sekarang!"}
+                  </button>
+                  <button
+                    onClick={(e) => { e.stopPropagation(); setConfirmCloseId(null); }}
+                    disabled={isClosingTrade}
+                    className="px-4 py-2.5 border border-slate-700 hover:bg-slate-800 text-slate-300 hover:text-white font-semibold rounded-xl text-[11px] font-mono transition cursor-pointer"
+                  >
+                    Tidak
+                  </button>
+                </>
+              ) : (
+                <>
+                  <button
+                    onClick={(e) => { e.stopPropagation(); console.log("[AIBot] Confirm step 1 for:", selectedTrade.id); setConfirmCloseId(selectedTrade.id); }}
+                    disabled={isClosingTrade}
+                    className="flex-1 bg-rose-600 hover:bg-rose-700 text-white font-bold py-2.5 rounded-xl active:scale-[0.98] transition cursor-pointer disabled:opacity-50 text-[11px] font-mono text-center"
+                  >
+                    Tutup Posisi Sekarang
+                  </button>
+                  <button
+                    onClick={(e) => { e.stopPropagation(); setSelectedTrade(null); setConfirmCloseId(null); }}
+                    className="px-4 py-2.5 border border-slate-800 hover:bg-slate-800 text-slate-300 hover:text-white font-semibold rounded-xl text-[11px] font-mono transition cursor-pointer"
+                  >
+                    Batal
+                  </button>
+                </>
+              )}
             </div>
           </div>
         </div>
