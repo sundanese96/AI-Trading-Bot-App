@@ -104,7 +104,7 @@ export function CorrelationMatrix() {
   // Load and apply slight real-time fluctuations to simulate market micro-dynamics
   const computeMatrix = () => {
     const newMatrix: { [key: string]: { [key: string]: number } } = {};
-    const noise = (Math.random() - 0.5) * 0.04; // minor live fluctuation noise
+    const noise = (Math.random() - 0.5) * 0.04;
     
     ASSETS.forEach((row) => {
       newMatrix[row] = {};
@@ -113,9 +113,7 @@ export function CorrelationMatrix() {
           newMatrix[row][col] = 1.0;
         } else {
           const base = BASELINE_CORRELATIONS[row]?.[col]?.[timeframe] ?? 0.5;
-          // Apply dynamic fluctuation based on noise and timeframe dampener
           let val = base + noise * (timeframe === "1h" ? 1.5 : 0.8);
-          // Caps
           val = Math.max(-1.0, Math.min(1.0, val));
           newMatrix[row][col] = parseFloat(val.toFixed(2));
         }
@@ -124,20 +122,34 @@ export function CorrelationMatrix() {
     setMatrix(newMatrix);
   };
 
-  useEffect(() => {
+  const fetchMatrix = async () => {
+    try {
+      const res = await fetch(`/api/market/correlations?t=${Date.now()}`);
+      if (res.ok) {
+        const data = await res.json();
+        if (data.matrix) {
+          setMatrix(data.matrix);
+          return;
+        }
+      }
+    } catch (e) {
+      console.error("Gagal mengambil data korelasi:", e);
+    }
     computeMatrix();
-    // Simulate real-time correlation shifts every 8 seconds as BTC fluctuates
+  };
+
+  useEffect(() => {
+    fetchMatrix();
     const interval = setInterval(() => {
-      setBtcShiftFactor((Math.random() - 0.5) * 0.1);
-      computeMatrix();
-    }, 8000);
+      fetchMatrix();
+    }, 4000);
     return () => clearInterval(interval);
   }, [timeframe]);
 
   const handleRefresh = () => {
     setIsRefreshing(true);
     setTimeout(() => {
-      computeMatrix();
+      fetchMatrix();
       setIsRefreshing(false);
     }, 600);
   };

@@ -10,7 +10,11 @@ initial_assets = [
     { "symbol": 'BTC', "name": 'Bitcoin', "price": 62450.00, "change24h": -1.2, "history": [], "type": 'crypto' },
     { "symbol": 'ETH', "name": 'Ethereum', "price": 3420.50, "change24h": -1.8, "history": [], "type": 'crypto' },
     { "symbol": 'SOL', "name": 'Solana', "price": 138.20, "change24h": -3.4, "history": [], "type": 'crypto' },
+    { "symbol": 'BNB', "name": 'BNB', "price": 580.00, "change24h": -0.5, "history": [], "type": 'crypto' },
     { "symbol": 'XRP', "name": 'Ripple', "price": 0.584, "change24h": -2.1, "history": [], "type": 'crypto' },
+    { "symbol": 'ADA', "name": 'Cardano', "price": 0.452, "change24h": -1.5, "history": [], "type": 'crypto' },
+    { "symbol": 'SUI', "name": 'Sui', "price": 1.82, "change24h": 2.4, "history": [], "type": 'crypto' },
+    { "symbol": 'DOGE', "name": 'Dogecoin', "price": 0.142, "change24h": -4.2, "history": [], "type": 'crypto' },
     { "symbol": 'XAU', "name": 'Gold / Emas', "price": 2345.80, "change24h": 0.4, "history": [], "type": 'metal' },
     { "symbol": 'DXY', "name": 'US Dollar Index', "price": 104.50, "change24h": 0.15, "history": [], "type": 'fiat' },
 ]
@@ -21,7 +25,7 @@ for asset in initial_assets:
     for _ in range(20):
         pct = (random.random() - 0.5) * 0.008
         val = val * (1 + pct)
-        asset["history"].append(round(val, 4 if asset["symbol"] == "XRP" else 2))
+        asset["history"].append(round(val, 4 if asset["symbol"] in ["XRP", "ADA", "DOGE"] else 2))
 
 assets = list(initial_assets)
 
@@ -29,7 +33,11 @@ real_crypto_prices = {
     "BTC": { "price": 62450.00, "change24h": -1.2 },
     "ETH": { "price": 3420.50, "change24h": -1.8 },
     "SOL": { "price": 138.20, "change24h": -3.4 },
+    "BNB": { "price": 580.00, "change24h": -0.5 },
     "XRP": { "price": 0.584, "change24h": -2.1 },
+    "ADA": { "price": 0.452, "change24h": -1.5 },
+    "SUI": { "price": 1.82, "change24h": 2.4 },
+    "DOGE": { "price": 0.142, "change24h": -4.2 },
 }
 
 fng_cache = {
@@ -83,7 +91,7 @@ def calculate_news_sentiment_index(news_items: List[Dict[str, Any]]) -> Dict[str
     return { "score": score, "classification": classification }
 
 async def update_real_crypto_prices():
-    symbols = ['BTC', 'ETH', 'SOL', 'XRP']
+    symbols = ['BTC', 'ETH', 'SOL', 'XRP', 'BNB', 'ADA', 'SUI', 'DOGE']
     async with httpx.AsyncClient(verify=False) as client:
         for sym in symbols:
             try:
@@ -165,7 +173,7 @@ async def market_simulation_loop():
                             change_pct -= 0.009
                         elif asset["symbol"] == "ETH":
                             change_pct -= 0.012
-                        elif asset["symbol"] in ["SOL", "XRP"]:
+                        elif asset["symbol"] in ["SOL", "XRP", "BNB", "ADA", "SUI", "DOGE"]:
                             change_pct -= 0.016
                         elif asset["symbol"] == "DXY":
                             change_pct += 0.002
@@ -174,7 +182,7 @@ async def market_simulation_loop():
                             change_pct += 0.012
                         elif asset["symbol"] == "BTC":
                             change_pct -= 0.008
-                        elif asset["symbol"] in ["SOL", "XRP"]:
+                        elif asset["symbol"] in ["SOL", "XRP", "BNB", "ADA", "SUI", "DOGE"]:
                             change_pct -= 0.014
                         elif asset["symbol"] == "XAU":
                             change_pct -= 0.004
@@ -185,7 +193,8 @@ async def market_simulation_loop():
                     if asset["type"] != "crypto":
                         price = price * (1 + change_pct)
                 
-                history = list(asset["history"][1:]) + [round(price, 4 if asset["symbol"] == "XRP" else 2)]
+                is_small_asset = asset["symbol"] in ["XRP", "ADA", "DOGE"]
+                history = list(asset["history"][1:]) + [round(price, 4 if is_small_asset else 2)]
                 
                 if current_panic["active"] or asset["type"] != "crypto":
                     initial_price = asset["history"][0] if asset["history"] else price
@@ -193,7 +202,7 @@ async def market_simulation_loop():
                 
                 new_assets.append({
                     **asset,
-                    "price": round(price, 4 if asset["symbol"] == "XRP" else 2),
+                    "price": round(price, 4 if is_small_asset else 2),
                     "change24h": round(change24h, 2),
                     "history": history
                 })
@@ -224,3 +233,64 @@ async def fear_and_greed_loop():
     while True:
         await update_fear_and_greed_index()
         await asyncio.sleep(300)
+
+def calculate_pearson_correlation(hist_x: List[float], hist_y: List[float]) -> float:
+    if len(hist_x) < 3 or len(hist_y) < 3:
+        return 0.0
+    # Align histories to the same length
+    length = min(len(hist_x), len(hist_y))
+    x = hist_x[-length:]
+    y = hist_y[-length:]
+    
+    # Calculate returns
+    ret_x = [(x[i] - x[i-1]) / x[i-1] for i in range(1, length)]
+    ret_y = [(y[i] - y[i-1]) / y[i-1] for i in range(1, length)]
+    
+    mean_x = sum(ret_x) / len(ret_x)
+    mean_y = sum(ret_y) / len(ret_y)
+    
+    num = sum((ret_x[i] - mean_x) * (ret_y[i] - mean_y) for i in range(len(ret_x)))
+    den_x = sum((ret_x[i] - mean_x) ** 2 for i in range(len(ret_x)))
+    den_y = sum((ret_y[i] - mean_y) ** 2 for i in range(len(ret_y)))
+    
+    if den_x == 0 or den_y == 0:
+        return 0.0
+    
+    return num / math.sqrt(den_x * den_y)
+
+def calculate_asset_beta(hist_target: List[float], hist_btc: List[float]) -> Dict[str, float]:
+    if len(hist_target) < 3 or len(hist_btc) < 3:
+        return { "correlation": 0.0, "beta": 1.0, "stdDevTarget": 0.0, "stdDevBtc": 0.0 }
+    
+    length = min(len(hist_target), len(hist_btc))
+    t = hist_target[-length:]
+    b = hist_btc[-length:]
+    
+    ret_t = [(t[i] - t[i-1]) / t[i-1] for i in range(1, length)]
+    ret_b = [(b[i] - b[i-1]) / b[i-1] for i in range(1, length)]
+    
+    mean_t = sum(ret_t) / len(ret_t)
+    mean_b = sum(ret_b) / len(ret_b)
+    
+    # Variance and Covariance (sample-based, using N-1)
+    n = len(ret_t)
+    var_b = sum((ret_b[i] - mean_b) ** 2 for i in range(n)) / (n - 1)
+    cov_tb = sum((ret_t[i] - mean_t) * (ret_b[i] - mean_b) for i in range(n)) / (n - 1)
+    
+    if var_b == 0:
+        return { "correlation": 0.0, "beta": 1.0, "stdDevTarget": 0.0, "stdDevBtc": 0.0 }
+    
+    beta = cov_tb / var_b
+    
+    std_t = math.sqrt(sum((ret_t[i] - mean_t) ** 2 for i in range(n)) / (n - 1))
+    std_b = math.sqrt(var_b)
+    correlation = 0.0
+    if std_t > 0 and std_b > 0:
+        correlation = cov_tb / (std_t * std_b)
+        
+    return {
+        "correlation": round(correlation, 4),
+        "beta": round(beta, 4),
+        "stdDevTarget": round(std_t, 6),
+        "stdDevBtc": round(std_b, 6)
+    }

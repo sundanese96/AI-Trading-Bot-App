@@ -300,34 +300,20 @@ async def toggle_ai_bot(request: Request):
 async def trigger_ai_bot():
     """Trigger a manual AI bot evaluation step using the mature FastAPI pipeline."""
     try:
-        from backend.services.market import assets
         from backend.services.news import news_feed
-
-        bot = sentix_state["aiBotSettings"]
-        symbol = bot.get("symbol", "BTCUSDT")
-        prices = _get_current_prices()
-        live_price = prices.get(symbol, 64000)
+        from backend.main import trigger_automated_trade_sim
+        from backend.database import load_ai_config
 
         # Use latest news for analysis if available
-        headline = "Market analysis trigger"
+        headline = "Pasar Cryptocurrency menunjukkan pergerakan sideways yang stabil."
+        source = "System Manual Trigger"
         if news_feed:
             headline = news_feed[0].get("headline", headline)
+            source = news_feed[0].get("source", source)
 
-        # Create a log entry
-        log_entry = {
-            "id": f"log-{int(time.time() * 1000)}",
-            "timestamp": int(time.time() * 1000),
-            "action": "INFO",
-            "symbol": symbol,
-            "price": live_price,
-            "confidence": 50,
-            "message": f"🤖 [AI BOT]: Evaluasi manual dipicu. Menganalisis pasar {symbol} @ ${live_price:,.2f}. Headline: {headline[:80]}"
-        }
-        if "aiBotLogs" not in sentix_state:
-            sentix_state["aiBotLogs"] = []
-        sentix_state["aiBotLogs"].insert(0, log_entry)
-        sentix_state["aiBotLogs"] = sentix_state["aiBotLogs"][:100]
-        _save_sentix_db()
+        config = await load_ai_config() or {}
+        dummy_item = {"title": headline, "source": source}
+        await trigger_automated_trade_sim(dummy_item, config)
 
         return {"success": True, "message": "Evaluasi manual berhasil dipicu."}
     except Exception as e:
@@ -528,7 +514,12 @@ async def train_ml_model(request: Request):
         # Trigger actual Python ML training loop in the background to build the real model
         from backend.services.ml.model import train_model
         from backend.config import DB_PATH as db_path
-        feather_path = db_path.parent / "Train-data" / "BTC_USDT_futures_1m.feather"
+        
+        if symbol == "BTCUSDT":
+            feather_path = db_path.parent / "Train-data" / "BTC_USDT_futures_1m.feather"
+        else:
+            feather_path = db_path.parent / "Train-data" / f"{symbol}_5m.feather"
+            
         if not feather_path.exists():
             feather_path = db_path.parent / "backend" / "btc_1m_mock.feather"
         if not feather_path.exists():

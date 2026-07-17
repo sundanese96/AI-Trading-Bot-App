@@ -179,18 +179,20 @@ export function CryptoTicker({ onSelectCoin, selectedCoin }: CryptoTickerProps) 
   return (
     <div className="bg-slate-950/80 border-b border-slate-900 px-6 py-3 flex flex-wrap items-center justify-between gap-4 backdrop-blur-md">
       {/* Label and Live Status */}
-      <div className="flex items-center gap-3 flex-wrap">
-        <div className="flex items-center gap-2">
-          <span className="relative flex h-2 w-2">
-            <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
-            <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
-          </span>
-          <span className="text-[11px] font-bold tracking-wider text-slate-400 uppercase font-sans">
-            Live Market Ticker
-          </span>
+      <div className="flex items-center gap-4 flex-wrap">
+        <div className="flex flex-col justify-center">
+          <div className="flex items-center gap-2">
+            <span className="relative flex h-2 w-2 shrink-0">
+              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+              <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
+            </span>
+            <span className="text-[11px] font-bold tracking-wider text-slate-400 uppercase font-sans whitespace-nowrap">
+              Live Market Ticker
+            </span>
+          </div>
           {lastUpdated && (
-            <span className="text-[9px] font-mono text-slate-600 hidden sm:inline">
-              (Sinc: {lastUpdated})
+            <span className="text-[9px] font-mono text-slate-600 ml-4 whitespace-nowrap">
+              (Sync: {lastUpdated})
             </span>
           )}
         </div>
@@ -210,7 +212,7 @@ export function CryptoTicker({ onSelectCoin, selectedCoin }: CryptoTickerProps) 
       </div>
 
       {/* Ticker Row */}
-      <div className="flex items-center gap-3 overflow-x-auto no-scrollbar scroll-smooth flex-1 justify-start md:justify-end">
+      <div className="flex items-center gap-3 overflow-x-auto no-scrollbar scroll-smooth flex-1 justify-start">
         {loading && assets.length === 0 ? (
           <div className="flex items-center gap-2 text-xs text-slate-500 font-mono py-1">
             <RefreshCw className="h-3 w-3 animate-spin text-slate-400" />
@@ -231,40 +233,34 @@ export function CryptoTicker({ onSelectCoin, selectedCoin }: CryptoTickerProps) 
             if (flash === "up") flashClass = "ring-2 ring-emerald-500/50 bg-emerald-950/20";
             if (flash === "down") flashClass = "ring-2 ring-red-500/50 bg-red-950/20";
 
-            return (
+             return (
               <div
                 key={asset.symbol}
                 onClick={() => handleCardClick(asset.symbol)}
                 className={`flex items-center gap-2.5 px-3 py-1.5 rounded-xl border transition-all duration-300 cursor-pointer select-none shrink-0 ${
                   isSelected
-                    ? "bg-slate-900/90 border-indigo-500 shadow-sm shadow-indigo-500/10 scale-102"
+                    ? "bg-slate-900/90 border-indigo-500 shadow-sm shadow-indigo-500/10"
                     : "bg-slate-900/30 border-slate-900 hover:border-slate-800 hover:bg-slate-900/50"
                 } ${flashClass}`}
               >
-                {/* Asset Label & Type */}
-                <div className="flex flex-col">
-                  <div className="flex items-center gap-1">
-                    <span className={`text-[10px] font-mono px-1 rounded border font-bold ${getAssetBadgeColor(asset.type)}`}>
-                      {asset.symbol}
-                    </span>
-                    <span className="text-[10px] font-medium text-slate-400 hidden lg:inline max-w-[80px] truncate">
-                      {asset.name}
-                    </span>
-                  </div>
-                </div>
+                {/* Asset Symbol Badge */}
+                <span className={`text-[10px] font-mono px-1.5 py-0.5 rounded border font-bold shrink-0 ${getAssetBadgeColor(asset.type)}`}>
+                  {asset.symbol}
+                </span>
 
-                {/* Price Display */}
-                <div className="flex flex-col items-end">
-                  <span className="text-xs font-mono font-bold text-white transition-colors duration-200">
+                {/* Price and Percentage Column */}
+                <div className="flex flex-col items-center justify-center font-mono shrink-0">
+                  {/* Price */}
+                  <span className="text-[12px] font-bold text-slate-100 leading-tight transition-colors duration-200">
                     {asset.symbol !== "DXY" ? "$" : ""}{formatPrice(asset.price, asset.symbol)}
                   </span>
                   
-                  {/* 24h Change badge */}
-                  <span className={`flex items-center text-[9px] font-mono font-bold ${changeIsPositive ? "text-emerald-400" : "text-red-400"}`}>
+                  {/* 24h Change percentage */}
+                  <span className={`flex items-center text-[9.5px] font-bold leading-tight ${changeIsPositive ? "text-emerald-400" : "text-red-400"}`}>
                     {changeIsPositive ? (
-                      <ArrowUpRight className="h-2.5 w-2.5 inline shrink-0" />
+                      <ArrowUpRight className="h-2.5 w-2.5 inline shrink-0 mr-0.5" />
                     ) : (
-                      <ArrowDownRight className="h-2.5 w-2.5 inline shrink-0" />
+                      <ArrowDownRight className="h-2.5 w-2.5 inline shrink-0 mr-0.5" />
                     )}
                     {changeIsPositive ? "+" : ""}{asset.change24h.toFixed(2)}%
                   </span>

@@ -79,7 +79,7 @@ export function LoginScreen({ onLoginSuccess }: LoginScreenProps) {
           {/* Username Input */}
           <div className="space-y-1.5">
             <label className="text-xs font-semibold text-slate-400 block" htmlFor="username">
-              Password
+              Username
             </label>
             <div className="relative">
               <span className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-500">
@@ -102,7 +102,7 @@ export function LoginScreen({ onLoginSuccess }: LoginScreenProps) {
           <div className="space-y-1.5">
             <div className="flex justify-between items-center">
               <label className="text-xs font-semibold text-slate-400 block" htmlFor="password">
-                Username
+                Password
               </label>
             </div>
             <div className="relative">

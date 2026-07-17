@@ -47,6 +47,8 @@ interface AiBotSettings {
   slMultiplier: number;
   runIntervalSeconds?: number;
   isCustom?: boolean;
+  modelType?: string;
+  timeframeMinutes?: number;
 }
 
 const PRESETS = {
@@ -159,6 +161,8 @@ const [settings, setSettings] = useState<AiBotSettings>({
     tpMultiplier: 1.0,
     slMultiplier: 1.0,
     runIntervalSeconds: 60,
+    modelType: "xgboost",
+    timeframeMinutes: 15,
   });
 
   const [botStatus, setBotStatus] = useState<BotStatusData>({
@@ -341,6 +345,9 @@ const [settings, setSettings] = useState<AiBotSettings>({
       const response = await fetch("/api/ai-bot/trigger", { method: "POST" });
       if (response.ok) {
         const data = await response.json();
+        if (data.success === false) {
+          throw new Error(data.message || "Evaluasi manual bot gagal.");
+        }
         setStatusMsg({ text: "⚡ AI Bot Evaluator berhasil dieksekusi secara manual. Periksa konsol aktivitas di bawah!", isError: false });
         fetchBotStatus();
       } else {
@@ -615,7 +622,7 @@ const [settings, setSettings] = useState<AiBotSettings>({
                     onChange={(e) => setSettings((prev) => ({ ...prev, symbol: e.target.value }))}
                     className="w-full bg-slate-950 border border-slate-800 focus:border-indigo-500 rounded-xl px-3 py-2.5 outline-none font-mono font-bold text-white"
                   >
-                    {["BTCUSDT", "ETHUSDT", "SOLUSDT", "BNBUSDT", "XRPUSDT"].map((c) => (
+                    {["BTCUSDT", "ETHUSDT", "SOLUSDT", "BNBUSDT", "XRPUSDT", "ADAUSDT", "SUIUSDT", "DOGEUSDT"].map((c) => (
                       <option key={c} value={c}>{c.replace("USDT", "")} / USDT</option>
                     ))}
                   </select>
@@ -637,6 +644,46 @@ const [settings, setSettings] = useState<AiBotSettings>({
                     <option value="HEDGING">🔒 HEDGING (Membuka Posisi Protektif Dua Arah)</option>
                   </select>
                   <p className="text-[10px] text-slate-500">Menentukan regulasi manajemen risiko otomatis sistem.</p>
+                </div>
+              </div>
+
+              {/* ML Model Configuration */}
+              <div className="bg-slate-950/40 p-4 rounded-xl border border-slate-850 space-y-4">
+                <div className="flex justify-between items-center border-b border-slate-850 pb-2">
+                  <span className="font-mono text-slate-200 font-bold flex items-center gap-1.5">
+                    <Activity className="h-4 w-4 text-emerald-400" />
+                    PENGATURAN MODEL ML (MACHINE LEARNING)
+                  </span>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div className="space-y-1.5">
+                    <label className="text-slate-400 font-mono text-[10px]">TARGET MODEL AKTIF</label>
+                    <select
+                      value={settings.modelType}
+                      onChange={(e) => setSettings((prev) => ({ ...prev, modelType: e.target.value }))}
+                      className="w-full bg-slate-950 border border-slate-800 focus:border-emerald-500 rounded-xl px-3 py-2.5 outline-none font-sans font-bold text-white text-sm"
+                    >
+                      <option value="xgboost">XGBoost (Rekomendasi Utama)</option>
+                      <option value="lightgbm">LightGBM (Cepat & Ringan)</option>
+                      <option value="catboost">CatBoost (Akurasi Tinggi GPU)</option>
+                    </select>
+                    <p className="text-[9px] text-slate-500 mt-1">Pilih mesin kecerdasan buatan utama.</p>
+                  </div>
+
+                  <div className="space-y-1.5">
+                    <label className="text-slate-400 font-mono text-[10px]">TIMEFRAME ANALISIS</label>
+                    <select
+                      value={settings.timeframeMinutes}
+                      onChange={(e) => setSettings((prev) => ({ ...prev, timeframeMinutes: Number(e.target.value) }))}
+                      className="w-full bg-slate-950 border border-slate-800 focus:border-emerald-500 rounded-xl px-3 py-2.5 outline-none font-sans font-bold text-white text-sm"
+                    >
+                      <option value={5}>5 Menit (Scalping Agresif)</option>
+                      <option value={15}>15 Menit (Day Trading Standar)</option>
+                      <option value={60}>60 Menit (Swing Jangka Panjang)</option>
+                    </select>
+                    <p className="text-[9px] text-slate-500 mt-1">Resolusi waktu data candle yang diproses.</p>
+                  </div>
                 </div>
               </div>
 
@@ -984,9 +1031,9 @@ const [settings, setSettings] = useState<AiBotSettings>({
 
                   return (
                     <div key={log.id} className="border-b border-slate-900/45 pb-2.5 space-y-1.5">
-                      <div className="flex justify-between items-center text-[9px] text-slate-500">
+                      <div className="flex justify-between items-center gap-2 text-[9px] text-slate-500">
                         <span>{new Date(log.timestamp).toLocaleTimeString("id-ID")} | {log.symbol}</span>
-                        <span className={actionColor}>{actionLabel} (C:{log.confidence}%)</span>
+                        <span className={`${actionColor} ml-2 shrink-0`}>{actionLabel} (C:{log.confidence}%)</span>
                       </div>
                       <p className="text-slate-300 break-words leading-normal">{log.message}</p>
                     </div>

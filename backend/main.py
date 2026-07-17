@@ -11,7 +11,7 @@ from contextlib import asynccontextmanager
 from pydantic import BaseModel
 from typing import Optional, List, Dict, Any
 
-from backend.config import GEMINI_API_KEY, OPENAI_API_KEY, ANTHROPIC_API_KEY, CUSTOM_AI_KEY, PORT, HOST, DASHBOARD_USERNAME, DASHBOARD_PASSWORD
+from backend.config import GEMINI_API_KEY, OPENAI_API_KEY, ANTHROPIC_API_KEY, CUSTOM_AI_KEY, PORT, HOST, DASHBOARD_USERNAME, DASHBOARD_PASSWORD, BASE_DIR
 from backend.database import read_database, write_database
 from backend.services import db_manager
 from backend.services.historical_scraper import scrape_google_news_historical
@@ -145,6 +145,75 @@ async def trigger_automated_trade_sim(item: Dict[str, Any], config: Dict[str, An
         confidence = trade_decision.get("confidence", 0)
         threshold = bot_settings.get("minConfidence", config.get("confidenceThreshold", 75))
         
+        # Pearson Correlation & Beta News Translation for Altcoins/Meme Coins
+        correlation_log = ""
+        is_translated = False
+        r_val = 0.0
+        beta_val = 1.0
+        
+        if active_asset != "BTC":
+            from backend.services.market import assets, calculate_asset_beta
+            hist_target = []
+            hist_btc = []
+            for a in assets:
+                if a["symbol"].upper() == active_asset:
+                    hist_target = a["history"]
+                elif a["symbol"].upper() == "BTC":
+                    hist_btc = a["history"]
+                    
+            if hist_target and hist_btc:
+                stats = calculate_asset_beta(hist_target, hist_btc)
+                r_val = stats["correlation"]
+                beta_val = stats["beta"]
+                
+                # Check if news is general/macro or BTC/Crypto specific
+                headline_lower = headline.lower()
+                is_general_news = any(k in headline_lower for k in ["btc", "bitcoin", "market", "crypto", "fed", "inflation", "cpi", "nfp", "sec", "etf", "induk", "receh", "meme"])
+                
+                if is_general_news and abs(r_val) >= 0.45:
+                    # Translate sentiment/expected movement mathematically
+                    # Extract BTC expected impact from assetsImpact if available, otherwise estimate from headline sentiment
+                    btc_expected_pct = 0.0
+                    assets_impact = analysis.get("assetsImpact", [])
+                    for impact_item in assets_impact:
+                        if impact_item.get("symbol") == "BTC":
+                            btc_expected_pct = float(impact_item.get("percentage", 0.0))
+                            break
+                    
+                    if btc_expected_pct == 0.0:
+                        # Fallback estimation based on analysis sentiment
+                        sentiment = analysis.get("sentiment", "NEUTRAL")
+                        if sentiment == "POSITIVE":
+                            btc_expected_pct = 0.15
+                        elif sentiment == "NEGATIVE":
+                            btc_expected_pct = -0.15
+                        elif sentiment == "CRITICAL":
+                            btc_expected_pct = -0.30
+                            
+                    # Calculate translated impact on target asset using Beta
+                    target_expected_pct = round(btc_expected_pct * beta_val, 4)
+                    
+                    # Convert to trade decision
+                    if target_expected_pct > 0.02:
+                        decision = "LONG"
+                        confidence = int(min(95, max(30, confidence * abs(r_val))))
+                    elif target_expected_pct < -0.02:
+                        decision = "SHORT"
+                        confidence = int(min(95, max(30, confidence * abs(r_val))))
+                    else:
+                        decision = "HOLD"
+                        confidence = int(confidence * (1 - abs(r_val)))
+                        
+                    # Update decision object
+                    trade_decision["decision"] = decision
+                    trade_decision["confidence"] = confidence
+                    
+                    is_translated = True
+                    correlation_log = (
+                        f" | Translasi Berita BTC: r={r_val:+.2f}, β={beta_val:+.2f}, "
+                        f"Dampak BTC ({btc_expected_pct:+.2f}%) -> {active_asset} ({target_expected_pct:+.2f}%)"
+                    )
+
         strategy = bot_settings.get("strategy", "CONSERVATIVE").upper()
         
         # Decide if we check Veto Gate based on strategy
@@ -164,6 +233,9 @@ async def trigger_automated_trade_sim(item: Dict[str, Any], config: Dict[str, An
             elif decision == "HOLD":
                 log_action = "HOLD"
                 
+            is_small = target_asset in ["DOGE", "ADA", "XRP"]
+            price_fmt = f"${live_price:,.4f}" if is_small else f"${live_price:,.2f}"
+            
             log_entry = {
                 "id": f"log-bot-{int(time.time() * 1000)}",
                 "timestamp": int(time.time() * 1000),
@@ -171,7 +243,7 @@ async def trigger_automated_trade_sim(item: Dict[str, Any], config: Dict[str, An
                 "symbol": f"{target_asset}USDT",
                 "price": live_price,
                 "confidence": confidence,
-                "message": f"🤖 [AI BOT Auto ({strategy})]: Menganalisis {target_asset} @ ${live_price:,.2f}. Keputusan: {decision} ({confidence}%). Alasan: {trade_decision.get('strategyReasoning', '')}"
+                "message": f"🤖 [AI BOT Auto ({strategy})]: Menganalisis {target_asset} @ {price_fmt}. Keputusan: {decision} ({confidence}%). Alasan: {trade_decision.get('strategyReasoning', '')}{correlation_log}"
             }
             
             if "aiBotLogs" not in sentix_state:
@@ -485,11 +557,27 @@ async def ai_bot_automated_loop():
     
     last_run_time = 0
     last_evaluated_key = None
+    last_enabled = False
+    last_symbol = None
+    last_strategy = None
     
     while True:
         try:
             bot_settings = sentix_state.get("aiBotSettings", {})
             enabled = bot_settings.get("enabled", False)
+            symbol = bot_settings.get("symbol", "BTCUSDT")
+            strategy = bot_settings.get("strategy", "CONSERVATIVE")
+            
+            # Detect activation toggle or setting changes
+            settings_changed = (symbol != last_symbol) or (strategy != last_strategy)
+            if (enabled and not last_enabled) or (enabled and settings_changed):
+                print(f"[AI Bot Loop] Activation toggle or settings changed (Symbol: {symbol}, Strategy: {strategy}). Resetting throttle and evaluating immediately.")
+                last_run_time = 0
+                last_evaluated_key = None
+                
+            last_enabled = enabled
+            last_symbol = symbol
+            last_strategy = strategy
             
             if enabled:
                 now = time.time()
@@ -505,7 +593,7 @@ async def ai_bot_automated_loop():
                         source = news_feed[0].get("source", source)
                     
                     # Generate dynamic key representing current evaluation state
-                    current_key = f"{headline}-{bot_settings.get('symbol', 'BTCUSDT')}-{bot_settings.get('strategy', 'CONSERVATIVE')}"
+                    current_key = f"{headline}-{symbol}-{strategy}"
                     if current_key == last_evaluated_key:
                         # Sleep briefly and continue to avoid duplicate evaluations
                         await asyncio.sleep(1)
@@ -640,7 +728,7 @@ async def add_cache_control_header(request: Request, call_next):
     return response
 
 # Persistent Session Management
-SESSION_FILE = "/home/x/AI-Trading-Bot-App/.session_token"
+SESSION_FILE = str(BASE_DIR / ".session_token")
 
 def get_active_session_id():
     import os
@@ -838,6 +926,33 @@ async def get_market_data():
         "assets": assets,
         "panic": current_panic,
         "time": time.strftime("%Y-%m-%dT%H:%M:%S.000Z", time.gmtime())
+    }
+
+@app.get("/api/market/correlations")
+async def get_market_correlations():
+    from backend.services.market import assets, calculate_pearson_correlation
+    target_symbols = ["BTC", "ETH", "SOL", "BNB", "XRP", "ADA", "SUI", "DOGE"]
+    
+    histories = {}
+    for a in assets:
+        sym = a["symbol"].upper()
+        if sym in target_symbols:
+            histories[sym] = a["history"]
+            
+    matrix = {}
+    for sym_a in target_symbols:
+        matrix[sym_a] = {}
+        for sym_b in target_symbols:
+            if sym_a == sym_b:
+                matrix[sym_a][sym_b] = 1.0
+            else:
+                hist_a = histories.get(sym_a, [])
+                hist_b = histories.get(sym_b, [])
+                r = calculate_pearson_correlation(hist_a, hist_b)
+                matrix[sym_a][sym_b] = round(r, 2)
+                
+    return {
+        "matrix": matrix
     }
 
 @app.get("/api/fear-and-greed")
