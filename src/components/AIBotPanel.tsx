@@ -678,14 +678,14 @@ const [settings, setSettings] = useState<AiBotSettings>({
                   <select
                     value={settings.strategy}
                     onChange={(e) => setSettings((prev) => ({ ...prev, strategy: e.target.value as any }))}
-                    className="w-full bg-slate-950 border border-slate-800 focus:border-indigo-500 rounded-xl px-3 py-2.5 outline-none font-sans font-bold text-white"
+                    className="w-full bg-slate-950 border border-slate-800 focus:border-indigo-500 rounded-xl px-3 py-2.5 outline-none font-sans font-bold text-white text-xs"
                   >
-                    <option value="CONSERVATIVE">🛡️ CONSERVATIVE (Hati-Hati, Presisi Tinggi)</option>
-                    <option value="SCALPING">⚡ SCALPING (Cepat, Profit Mikro, SL Ketat)</option>
-                    <option value="SWING">📈 SWING (Tren Panjang, Target Profit Lebar)</option>
-                    <option value="AGGRESSIVE">🔥 AGGRESSIVE (Sensitivitas Tinggi, Leverage Maks)</option>
-                    <option value="MARTINGALE">🔄 MARTINGALE (Penggandaan Posisi, Target Rebound Cepat)</option>
-                    <option value="HEDGING">🔒 HEDGING (Membuka Posisi Protektif Dua Arah)</option>
+                    <option value="CONSERVATIVE">🛡️ CONSERVATIVE (Hati-Hati | Veto Gate: Aktif)</option>
+                    <option value="SCALPING">⚡ SCALPING (Cepat | Veto Gate: BYPASS)</option>
+                    <option value="SWING">📈 SWING (Tren Jangka Panjang | Veto Gate: Aktif)</option>
+                    <option value="AGGRESSIVE">🔥 AGGRESSIVE (Agresif & Sensitif | Veto Gate: BYPASS)</option>
+                    <option value="MARTINGALE">🔄 MARTINGALE (Averaging Down | Veto Gate: Aktif)</option>
+                    <option value="HEDGING">🔒 HEDGING (Posisi Dua Arah | Veto Gate: BYPASS)</option>
                   </select>
                   <p className="text-[10px] text-slate-500">Menentukan regulasi manajemen risiko otomatis sistem.</p>
                 </div>

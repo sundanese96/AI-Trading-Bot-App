@@ -287,7 +287,6 @@ export default function App() {
     }
   };
 
-  // Handler: Terminate active position manual closure
   const handleClosePosition = async (tradeId: string) => {
     try {
       const response = await fetch("/api/trade/close", {
@@ -296,13 +295,19 @@ export default function App() {
         body: JSON.stringify({ tradeId }),
       });
       if (response.ok) {
-        fetchBackendState();
+        const resData = await response.json();
+        if (resData.success) {
+          fetchBackendState();
+        } else {
+          alert(resData.message || "Gagal melikuidasi posisi.");
+        }
       } else {
         const resData = await response.json();
         alert(resData.message || "Gagal melikuidasi posisi.");
       }
-    } catch (e) {
+    } catch (e: any) {
       console.error("Error closing position manual:", e);
+      alert("Error: " + e.message);
     }
   };
 
