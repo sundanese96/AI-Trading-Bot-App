@@ -46,22 +46,14 @@ export default function App() {
   const [activeTab, setActiveTab] = useState<"TRADING" | "NEWS" | "BACKTEST" | "ML" | "AI_BOT" | "SETTINGS" | "LIVE" | "DOCS">("TRADING");
 
   // Tab Visit Flags to lazy-mount tabs and keep them persistently mounted once visited
-  const [newsVisited, setNewsVisited] = useState(false);
-  const [backtestVisited, setBacktestVisited] = useState(false);
-  const [mlVisited, setMlVisited] = useState(false);
-  const [aiBotVisited, setAiBotVisited] = useState(false);
-  const [settingsVisited, setSettingsVisited] = useState(false);
-  const [liveVisited, setLiveVisited] = useState(false);
-  const [docsVisited, setDocsVisited] = useState(false);
+  const [visitedTabs, setVisitedTabs] = useState<Set<string>>(new Set(["TRADING"]));
 
   useEffect(() => {
-    if (activeTab === "NEWS") setNewsVisited(true);
-    if (activeTab === "BACKTEST") setBacktestVisited(true);
-    if (activeTab === "ML") setMlVisited(true);
-    if (activeTab === "AI_BOT") setAiBotVisited(true);
-    if (activeTab === "SETTINGS") setSettingsVisited(true);
-    if (activeTab === "LIVE") setLiveVisited(true);
-    if (activeTab === "DOCS") setDocsVisited(true);
+    setVisitedTabs((prev) => {
+      const newSet = new Set(prev);
+      newSet.add(activeTab);
+      return newSet;
+    });
   }, [activeTab]);
 
 
@@ -185,6 +177,10 @@ export default function App() {
       );
       if (response.ok) {
         const data = await response.json();
+        if (!Array.isArray(data)) {
+          console.error("Invalid Binance response", data);
+          return;
+        }
         const parsed: Candlestick[] = data.map((k: any) => ({
           time: k[0],
           open: parseFloat(k[1]),
@@ -740,7 +736,7 @@ export default function App() {
           </div>
           </div>
 
-          {newsVisited && (
+          {visitedTabs.has("NEWS") && (
             <div style={{ display: activeTab === "NEWS" ? "block" : "none" }}>
               <NewsPanel
                 news={news}
@@ -751,13 +747,13 @@ export default function App() {
             </div>
           )}
 
-          {backtestVisited && (
+          {visitedTabs.has("BACKTEST") && (
             <div style={{ display: activeTab === "BACKTEST" ? "block" : "none" }}>
               <BacktestPanel onRunBacktest={handleRunStrategyBacktest} />
             </div>
           )}
 
-          {mlVisited && (
+          {visitedTabs.has("ML") && (
             <div style={{ display: activeTab === "ML" ? "block" : "none" }}>
               <MLPanel
                 onTrainModel={handleTrainLocalMLModel}
@@ -767,7 +763,7 @@ export default function App() {
             </div>
           )}
 
-          {aiBotVisited && (
+          {visitedTabs.has("AI_BOT") && (
             <div style={{ display: activeTab === "AI_BOT" ? "block" : "none" }}>
               <AIBotPanel
                 savedModels={mlModels}
@@ -777,7 +773,7 @@ export default function App() {
             </div>
           )}
 
-          {settingsVisited && (
+          {visitedTabs.has("SETTINGS") && (
             <div style={{ display: activeTab === "SETTINGS" ? "block" : "none" }}>
               <SettingsPanel
                 settings={settings}
@@ -790,7 +786,7 @@ export default function App() {
             </div>
           )}
 
-          {liveVisited && (
+          {visitedTabs.has("LIVE") && (
             <div style={{ display: activeTab === "LIVE" ? "block" : "none" }}>
               <LiveTradingPanel
                 lang="ID"
@@ -800,7 +796,7 @@ export default function App() {
             </div>
           )}
 
-          {docsVisited && (
+          {visitedTabs.has("DOCS") && (
             <div style={{ display: activeTab === "DOCS" ? "block" : "none" }}>
               <DocsPanel />
             </div>

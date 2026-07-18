@@ -77,7 +77,8 @@ export const apiBot = {
   getSettings: async () => {
     const res = await fetchBase("/api/ai-bot/settings");
     if (!res.ok) throw new Error("Failed to fetch Bot settings");
-    return await res.json();
+    const data = await res.json();
+    return data.settings;
   },
   
   saveSettings: async (settings: any) => {

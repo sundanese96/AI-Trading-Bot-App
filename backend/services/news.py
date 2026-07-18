@@ -1,5 +1,9 @@
 import re
 from typing import List, Dict, Any
+import asyncio
+
+# Lock to protect news_feed from race conditions during concurrent scraping/updates
+news_feed_lock = asyncio.Lock()
 
 # Simple AFINN-based sentiment analyzer matching Node.js sentiment library
 AFINN = {

@@ -20,7 +20,7 @@ from backend.services.market import (
     assets, current_panic, fng_cache, calculate_asset_volatility,
     calculate_news_sentiment_index, market_simulation_loop, real_prices_loop, fear_and_greed_loop
 )
-from backend.services.news import news_feed, analyze_sentiment, AFINN
+from backend.services.news import news_feed, news_feed_lock, analyze_sentiment, AFINN
 from backend.services.ai import call_gemini, call_openai, call_anthropic, call_custom, call_semburat_gateway, clean_and_parse_json
 from backend.services.scraper import scrape_reuters_news, scrape_bbc_news, fetch_forexfactory_calendar, fetch_crypto_panic_news
 from backend.services.position_monitor import monitor_binance_positions_loop
@@ -85,392 +85,221 @@ def is_headline_duplicate(new_headline: str, feed: list, threshold: float = 0.8)
         if sim >= threshold:
             return True
     return False
-        
-    hl_lower = headline.lower()
+
+async def _evaluate_llm_trade_signal(headline, item, config, bot_settings):
+    from backend.services.market import assets, calculate_asset_beta
+    active_symbol = bot_settings.get("symbol", "BTCUSDT")
+    active_asset = active_symbol.upper().replace("USDT", "")
     
-    # Exclude obvious non-financial/non-geopolitical noise
-    exclude_keywords = ['entertainment', 'sports', 'movie', 'actor', 'actress', 'celeb', 'music', 'album', 'concert', 'football', 'soccer', 'tennis', 'olympic', 'pop-culture', 'comedy']
-    if any(e in hl_lower for e in exclude_keywords):
-        return False
-        
-    # Financial, Crypto, and Macro keywords
-    finance_keywords = [
-        'bitcoin', 'btc', 'ether', 'eth', 'solana', 'sol', 'ripple', 'xrp', 'crypto', 'coin', 'token', 
-        'blockchain', 'dxy', 'fed', 'cpi', 'inflation', 'gdp', 'rate', 
-        'treasury', 'dollar', 'gold', 'emas', 'stocks', 'market', 'sec', 'etf', 'binance', 'coinbase', 
-        'tether', 'usdt', 'finance', 'economic', 'unemployment', 'bank', 'bonds'
-    ]
+    req = AIAnalyzeRequest(
+        headline=headline,
+        source=item["source"],
+        provider=config.get("provider", "gemini"),
+        customUrl=config.get("customUrl", ""),
+        customKey=config.get("customKey", ""),
+        customModel=config.get("customModel", ""),
+        targetAsset=active_asset,
+        forecast=item.get("forecast", ""),
+        previous=item.get("previous", "")
+    )
     
-    # Geopolitical and Conflict keywords (having potential macro/market impact)
-    geopolitics_keywords = [
-        'war', 'strike', 'attack', 'missile', 'military', 'sanction', 'nuclear', 'conflict', 
-        'perang', 'rudal', 'militer', 'bom', 'sanksi', 'konflik', 'serangan', 'geopolitical', 
-        'tariff', 'china', 'russia', 'ukraine', 'iran', 'israel', 'gaza', 'border', 'clash', 
-        'treaty', 'alliance', 'summit', 'nato', 'defense'
-    ]
+    analysis_res = await analyze_ai(req)
+    analysis = analysis_res.get("analysis", {})
+    trade_decision = analysis.get("tradeDecision", {})
+    veto_gate = analysis.get("vetoGate", {})
     
-    if any(k in hl_lower for k in finance_keywords) or any(k in hl_lower for k in geopolitics_keywords):
-        return True
-        
-    return False
+    trade_decision["targetAsset"] = active_asset
+    decision = trade_decision.get("decision", "HOLD")
+    confidence = trade_decision.get("confidence", 0)
+    
+    correlation_log = ""
+    if active_asset != "BTC":
+        hist_target = []
+        hist_btc = []
+        for a in assets:
+            if a["symbol"].upper() == active_asset: hist_target = a["history"]
+            elif a["symbol"].upper() == "BTC": hist_btc = a["history"]
+                
+        if hist_target and hist_btc:
+            stats = calculate_asset_beta(hist_target, hist_btc)
+            r_val, beta_val = stats["correlation"], stats["beta"]
+            
+            is_general_news = any(k in headline.lower() for k in ["btc", "bitcoin", "market", "crypto", "fed", "inflation", "cpi", "nfp", "sec", "etf", "induk", "receh", "meme"])
+            if is_general_news and abs(r_val) >= 0.45:
+                btc_expected_pct = next((float(i.get("percentage", 0.0)) for i in analysis.get("assetsImpact", []) if i.get("symbol") == "BTC"), 0.0)
+                if btc_expected_pct == 0.0:
+                    sentiment = analysis.get("sentiment", "NEUTRAL")
+                    if sentiment == "POSITIVE": btc_expected_pct = 0.15
+                    elif sentiment == "NEGATIVE": btc_expected_pct = -0.15
+                    elif sentiment == "CRITICAL": btc_expected_pct = -0.30
+                
+                target_expected_pct = round(btc_expected_pct * beta_val, 4)
+                if target_expected_pct > 0.02:
+                    decision, confidence = "LONG", int(min(95, max(30, confidence * abs(r_val))))
+                elif target_expected_pct < -0.02:
+                    decision, confidence = "SHORT", int(min(95, max(30, confidence * abs(r_val))))
+                else:
+                    decision, confidence = "HOLD", int(confidence * (1 - abs(r_val)))
+                    
+                trade_decision["decision"] = decision
+                trade_decision["confidence"] = confidence
+                correlation_log = f" | Translasi Berita BTC: r={r_val:+.2f}, β={beta_val:+.2f}, Dampak BTC ({btc_expected_pct:+.2f}%) -> {active_asset} ({target_expected_pct:+.2f}%)"
+
+    strategy = bot_settings.get("strategy", "CONSERVATIVE").upper()
+    bypass_veto = strategy in ["AGGRESSIVE", "SCALPING", "HEDGING"]
+    veto_active = False if bypass_veto else veto_gate.get("vetoActive", False)
+    
+    return active_asset, decision, confidence, strategy, trade_decision, veto_active, correlation_log
+
+def _calculate_risk_parameters(bot_settings, live_price, decision, strategy):
+    lev_val = int(bot_settings.get("leverage", 10))
+    sl_pct = float(bot_settings.get("stopLossPct", 1.5)) * float(bot_settings.get("slMultiplier", 1.0))
+    tp_pct = float(bot_settings.get("takeProfitPct", 3.0)) * float(bot_settings.get("tpMultiplier", 1.0))
+    margin = float(bot_settings.get("allocationPerTrade", 1000.0))
+    
+    if strategy == "HEDGING":
+        h_sl_pct, h_tp_pct = 1.5, 3.0
+        return {
+            "lev": lev_val, "margin": margin,
+            "long_sl": live_price * (1 - h_sl_pct / 100), "long_tp": live_price * (1 + h_tp_pct / 100),
+            "short_sl": live_price * (1 + h_sl_pct / 100), "short_tp": live_price * (1 - h_tp_pct / 100),
+            "sl_pct_raw": h_sl_pct, "tp_pct_raw": h_tp_pct
+        }
+    
+    sl_price = live_price * (1 - sl_pct / 100) if decision == "LONG" else live_price * (1 + sl_pct / 100)
+    tp_price = live_price * (1 + tp_pct / 100) if decision == "LONG" else live_price * (1 - tp_pct / 100)
+    return {"lev": lev_val, "margin": margin, "sl_price": sl_price, "tp_price": tp_price, "sl_pct_raw": sl_pct, "tp_pct_raw": tp_pct}
+
+async def _execute_simulated_trade(headline, target_asset, decision, confidence, strategy, trade_decision, correlation_log, veto_active, bot_settings, threshold):
+    import time
+    from backend.core.logger import logger
+    from backend.sentix_adapter import sentix_state, _save_sentix_db
+    
+    live_price = get_asset_current_price(target_asset) or 64000.0
+    symbol_usdt = f"{target_asset}USDT"
+    
+    log_action = "BUY" if decision == "LONG" else "SELL" if decision == "SHORT" else "HOLD"
+    price_fmt = f"${live_price:,.4f}" if target_asset in ["DOGE", "ADA", "XRP"] else f"${live_price:,.2f}"
+    
+    log_entry = {
+        "id": f"log-bot-{int(time.time() * 1000)}",
+        "timestamp": int(time.time() * 1000),
+        "action": log_action,
+        "symbol": symbol_usdt,
+        "price": live_price,
+        "confidence": confidence,
+        "message": f"🤖 [AI BOT Auto ({strategy})]: Menganalisis {target_asset} @ {price_fmt}. Keputusan: {decision} ({confidence}%). Alasan: {trade_decision.get('strategyReasoning', '')}{correlation_log}"
+    }
+    
+    if "aiBotLogs" not in sentix_state: sentix_state["aiBotLogs"] = []
+    
+    sentiment_threshold = float(bot_settings.get("sentimentThreshold", 0.0))
+    if decision in ["LONG", "SHORT"] and (confidence / 100.0) < sentiment_threshold:
+        decision, log_entry["action"] = "HOLD", "HOLD"
+        log_entry["message"] += f" [Veto: Sentimen Aktual {confidence/100.0:.2f} < Batas {sentiment_threshold}]"
+
+    sentix_state["aiBotLogs"].insert(0, log_entry)
+    sentix_state["aiBotLogs"] = sentix_state["aiBotLogs"][:100]
+    
+    risk = _calculate_risk_parameters(bot_settings, live_price, decision, strategy)
+    
+    if decision in ["LONG", "SHORT"] and not veto_active and confidence >= threshold:
+        margin = risk["margin"]
+        if strategy == "MARTINGALE":
+            closed_trades = sorted([t for t in sentix_state.get("trades", []) if t.get("status") == "CLOSED"], key=lambda x: x.get("closeTime", 0) or x.get("exitTimestamp", 0) or 0, reverse=True)
+            if closed_trades and (closed_trades[0].get("pnl", 0.0) or 0.0) < 0.0:
+                margin *= 2.0
+                log_entry["message"] += f" [Martingale Double Active: ${margin}]"
+
+        def add_sentix_trade(trade_type, sl_val, tp_val, active_margin):
+            qty = (active_margin * risk["lev"]) / live_price
+            if "trades" not in sentix_state: sentix_state["trades"] = []
+            sentix_state["trades"].append({
+                "id": f"trade-bot-{trade_type.lower()}-{int(time.time() * 1000)}",
+                "symbol": symbol_usdt, "type": trade_type, "size": round(qty, 6), "leverage": risk["lev"],
+                "entryPrice": live_price, "exitPrice": None, "pnl": None, "sl": round(sl_val, 2), "tp": round(tp_val, 2),
+                "trailingStopPct": None, "status": "OPEN", "timestamp": int(time.time() * 1000), "exitTimestamp": None,
+                "reason": f"AI_BOT_{strategy}"
+            })
+            sentix_state["portfolio"]["balanceUSD"] = round(sentix_state["portfolio"]["balanceUSD"] - active_margin, 2)
+            
+        if strategy == "HEDGING":
+            has_l = any(t.get("status") == "OPEN" and t.get("symbol") == symbol_usdt and t.get("type") == "BUY" for t in sentix_state.get("trades", []))
+            has_s = any(t.get("status") == "OPEN" and t.get("symbol") == symbol_usdt and t.get("type") == "SELL" for t in sentix_state.get("trades", []))
+            if not has_l: add_sentix_trade("BUY", risk["long_sl"], risk["long_tp"], margin)
+            if not has_s: add_sentix_trade("SELL", risk["short_sl"], risk["short_tp"], margin)
+        else:
+            if not any(t.get("status") == "OPEN" and t.get("symbol") == symbol_usdt for t in sentix_state.get("trades", [])):
+                add_sentix_trade("BUY" if decision == "LONG" else "SELL", risk["sl_price"], risk["tp_price"], margin)
+                
+    _save_sentix_db()
+    
+    if decision in ["LONG", "SHORT"] and not veto_active and confidence >= threshold:
+        from backend.database import db_lock, read_database_async, write_database_async
+        async with db_lock:
+            db = await read_database_async()
+            existing_trades = db.setdefault("savedTrades", [])
+            
+            def add_db_trade(trade_dec, sl_val, tp_val):
+                sim = {
+                    "id": f"trade-{trade_dec.lower()}-{int(time.time() * 1000)}", "timestamp": int(time.time() * 1000),
+                    "decision": trade_dec, "targetAsset": target_asset, "confidence": confidence,
+                    "recommendedLeverage": f"{risk['lev']}x", "recommendedStopLoss": f"{risk['sl_pct_raw']}%", "recommendedTakeProfit": f"{risk['tp_pct_raw']}%",
+                    "strategyReasoning": f"[{strategy} Strategy] {trade_decision.get('strategyReasoning', '')}",
+                    "status": "OPEN", "entryPrice": live_price, "currentPrice": live_price, "exitPrice": None, "closeTime": None,
+                    "closeReason": None, "pnl": 0.0, "headline": headline, "type": "SIMULATED"
+                }
+                if strategy == "HEDGING":
+                    sim["strategyReasoning"] = f"[HEDGING Strategy] Dual directional entry. {trade_decision.get('strategyReasoning', '')}"
+                db["savedTrades"].insert(0, sim)
+                db["savedTrades"] = db["savedTrades"][:100]
+
+            if strategy == "HEDGING":
+                if not any(t.get("status") == "OPEN" and t.get("targetAsset") == target_asset and t.get("decision") == "LONG" for t in existing_trades): add_db_trade("LONG", risk["long_sl"], risk["long_tp"])
+                if not any(t.get("status") == "OPEN" and t.get("targetAsset") == target_asset and t.get("decision") == "SHORT" for t in existing_trades): add_db_trade("SHORT", risk["short_sl"], risk["short_tp"])
+            else:
+                if not any(t.get("status") == "OPEN" and t.get("targetAsset") == target_asset for t in existing_trades):
+                    add_db_trade(decision, risk["sl_price"], risk["tp_price"])
+            await write_database_async(db)
+            
+        from backend.services.telegram_client import send_telegram_alert
+        import asyncio
+        asyncio.create_task(send_telegram_alert(f"🚀 *Simulated Trade Opened* 🚀\n\n*Asset*: {target_asset}\n*Action*: {decision}\n*Entry Price*: ${live_price}\n*Confidence*: {confidence}%\n*SL*: {risk['sl_pct_raw']}% | *TP*: {risk['tp_pct_raw']}%\n*Reason*: {trade_decision.get('strategyReasoning', '')}"))
 
 # Trigger simulated trade in paper trading mode
 async def trigger_automated_trade_sim(item: Dict[str, Any], config: Dict[str, Any]):
-    from backend.database import db_lock, read_database, read_database_async, write_database, read_database_async, write_database_async
+    from backend.core.logger import logger
+    from backend.services.news import analyze_sentiment
+    import time
+    
     try:
         headline = item["title"]
         source = item.get("source", "Unknown")
         
-        # Check relevance to avoid wasting local LLM resources and flooding activity console
         if not is_headline_relevant(headline, source):
             logger.info(f"[Sim Trading] Skipping LLM for irrelevant headline: {headline}")
-            # Insert into news_feed directly without running LLM to keep general news panel updated
             sentiment_res = analyze_sentiment(headline)
-            score = sentiment_res["score"]
-            lower = headline.lower()
-            geo_keywords = ['attack', 'strike', 'war', 'escalation', 'sanction', 'funeral', 'nuclear', 'serangan', 'perang', 'rudal', 'militer', 'bom', 'sanksi', 'konflik']
-            is_geo = any(k in lower for k in geo_keywords)
-            macro_keywords = ['nfp', 'cpi', 'fomc', 'gdp', 'inflation', 'fed', 'interest', 'suku bunga', 'pengangguran', 'inflasi', 'gaji', 'pekerjaan']
-            is_macro = any(k in lower for k in macro_keywords)
-            category = "GEOPOLITICS" if is_geo else ("MACRO" if is_macro else "GENERAL")
-            impact = "CRITICAL" if (is_geo or is_macro) else "NEUTRAL"
-            
-            # Check if already in news_feed to prevent duplicates
-            if not is_headline_duplicate(headline, news_feed):
-                new_item = {
-                    "id": f"news-{int(time.time() * 1000)}",
-                    "time": time.strftime("%H:%M:%S"),
-                    "headline": headline,
-                    "category": category,
-                    "impact": impact,
-                    "source": source,
-                    "details": f"Scraped from {source}. Sentiment score: {score}. Bypassed AI Bot Trade Analysis.",
-                    "forecast": item.get("forecast", ""),
-                    "previous": item.get("previous", ""),
-                    "isTriggeredShort": is_geo or is_macro,
-                    "isTriggeredGold": is_geo,
-                    "summaryId": f"Scraped news. Category: {category}. Bypassed AI Bot."
-                }
-                news_feed.insert(0, new_item)
-                if len(news_feed) > 50:
-                    news_feed.pop()
+            news_feed.insert(0, {
+                "id": f"n-{int(time.time() * 1000)}", "time": time.strftime("%H:%M:%S"),
+                "headline": headline, "category": "GENERAL", "impact": "LOW", "source": source,
+                "details": f"Scraped from {source}. Sentiment score: {sentiment_res['score']}. Bypassed AI Bot Trade Analysis.",
+                "forecast": item.get("forecast", ""), "previous": item.get("previous", ""),
+                "isTriggeredShort": False, "isTriggeredGold": False, "summaryId": f"Scraped news. Bypassed AI Bot."
+            })
+            if len(news_feed) > 50: news_feed.pop()
             return
             
         from backend.sentix_adapter import sentix_state
         bot_settings = sentix_state.get("aiBotSettings", {})
-        active_symbol = bot_settings.get("symbol", "BTCUSDT")
-        active_asset = active_symbol.upper().replace("USDT", "")
         
-        logger.info(f"[Sim Trading] Auto-running AI analysis for: {headline} (Target Asset: {active_asset})")
-        
-        # Call analyze_ai to enrich news, calculate volatilities, classify crisis, and update news_feed
-        req = AIAnalyzeRequest(
-            headline=headline,
-            source=item["source"],
-            provider=config.get("provider", "gemini"),
-            customUrl=config.get("customUrl", ""),
-            customKey=config.get("customKey", ""),
-            customModel=config.get("customModel", ""),
-            targetAsset=active_asset,
-            forecast=item.get("forecast", ""),
-            previous=item.get("previous", "")
-        )
-        
-        analysis_res = await analyze_ai(req)
-        analysis = analysis_res.get("analysis", {})
-        trade_decision = analysis.get("tradeDecision", {})
-        veto_gate = analysis.get("vetoGate", {})
-        
-        # Enforce that the trade decision target asset matches the user's configured active asset
-        trade_decision["targetAsset"] = active_asset
-        decision = trade_decision.get("decision", "HOLD")
-        target_asset = active_asset
-        confidence = trade_decision.get("confidence", 0)
+        target_asset, decision, confidence, strategy, trade_decision, veto_active, correlation_log = await _evaluate_llm_trade_signal(headline, item, config, bot_settings)
         threshold = bot_settings.get("minConfidence", config.get("confidenceThreshold", 75))
         
-        # Pearson Correlation & Beta News Translation for Altcoins/Meme Coins
-        correlation_log = ""
-        is_translated = False
-        r_val = 0.0
-        beta_val = 1.0
+        await _execute_simulated_trade(headline, target_asset, decision, confidence, strategy, trade_decision, correlation_log, veto_active, bot_settings, threshold)
         
-        if active_asset != "BTC":
-            from backend.services.market import assets, calculate_asset_beta
-            hist_target = []
-            hist_btc = []
-            for a in assets:
-                if a["symbol"].upper() == active_asset:
-                    hist_target = a["history"]
-                elif a["symbol"].upper() == "BTC":
-                    hist_btc = a["history"]
-                    
-            if hist_target and hist_btc:
-                stats = calculate_asset_beta(hist_target, hist_btc)
-                r_val = stats["correlation"]
-                beta_val = stats["beta"]
-                
-                # Check if news is general/macro or BTC/Crypto specific
-                headline_lower = headline.lower()
-                is_general_news = any(k in headline_lower for k in ["btc", "bitcoin", "market", "crypto", "fed", "inflation", "cpi", "nfp", "sec", "etf", "induk", "receh", "meme"])
-                
-                if is_general_news and abs(r_val) >= 0.45:
-                    # Translate sentiment/expected movement mathematically
-                    # Extract BTC expected impact from assetsImpact if available, otherwise estimate from headline sentiment
-                    btc_expected_pct = 0.0
-                    assets_impact = analysis.get("assetsImpact", [])
-                    for impact_item in assets_impact:
-                        if impact_item.get("symbol") == "BTC":
-                            btc_expected_pct = float(impact_item.get("percentage", 0.0))
-                            break
-                    
-                    if btc_expected_pct == 0.0:
-                        # Fallback estimation based on analysis sentiment
-                        sentiment = analysis.get("sentiment", "NEUTRAL")
-                        if sentiment == "POSITIVE":
-                            btc_expected_pct = 0.15
-                        elif sentiment == "NEGATIVE":
-                            btc_expected_pct = -0.15
-                        elif sentiment == "CRITICAL":
-                            btc_expected_pct = -0.30
-                            
-                    # Calculate translated impact on target asset using Beta
-                    target_expected_pct = round(btc_expected_pct * beta_val, 4)
-                    
-                    # Convert to trade decision
-                    if target_expected_pct > 0.02:
-                        decision = "LONG"
-                        confidence = int(min(95, max(30, confidence * abs(r_val))))
-                    elif target_expected_pct < -0.02:
-                        decision = "SHORT"
-                        confidence = int(min(95, max(30, confidence * abs(r_val))))
-                    else:
-                        decision = "HOLD"
-                        confidence = int(confidence * (1 - abs(r_val)))
-                        
-                    # Update decision object
-                    trade_decision["decision"] = decision
-                    trade_decision["confidence"] = confidence
-                    
-                    is_translated = True
-                    correlation_log = (
-                        f" | Translasi Berita BTC: r={r_val:+.2f}, β={beta_val:+.2f}, "
-                        f"Dampak BTC ({btc_expected_pct:+.2f}%) -> {active_asset} ({target_expected_pct:+.2f}%)"
-                    )
-
-        strategy = bot_settings.get("strategy", "CONSERVATIVE").upper()
-        
-        # Decide if we check Veto Gate based on strategy
-        bypass_veto = strategy in ["AGGRESSIVE", "SCALPING", "HEDGING"]
-        veto_active = False if bypass_veto else veto_gate.get("vetoActive", False)
-
-        # --- Bridge to Sentix Compatibility Adapter (AI Bot activity console) ---
-        try:
-            from backend.sentix_adapter import sentix_state, _save_sentix_db
-            live_price = get_asset_current_price(target_asset) or 64000.0
-            
-            log_action = "INFO"
-            if decision == "LONG":
-                log_action = "BUY"
-            elif decision == "SHORT":
-                log_action = "SELL"
-            elif decision == "HOLD":
-                log_action = "HOLD"
-                
-            is_small = target_asset in ["DOGE", "ADA", "XRP"]
-            price_fmt = f"${live_price:,.4f}" if is_small else f"${live_price:,.2f}"
-            
-            log_entry = {
-                "id": f"log-bot-{int(time.time() * 1000)}",
-                "timestamp": int(time.time() * 1000),
-                "action": log_action,
-                "symbol": f"{target_asset}USDT",
-                "price": live_price,
-                "confidence": confidence,
-                "message": f"🤖 [AI BOT Auto ({strategy})]: Menganalisis {target_asset} @ {price_fmt}. Keputusan: {decision} ({confidence}%). Alasan: {trade_decision.get('strategyReasoning', '')}{correlation_log}"
-            }
-            
-            if "aiBotLogs" not in sentix_state:
-                sentix_state["aiBotLogs"] = []
-
-            sentiment_threshold = float(bot_settings.get("sentimentThreshold", 0.0))
-            if decision in ["LONG", "SHORT"] and (confidence / 100.0) < sentiment_threshold:
-                decision = "HOLD"
-                log_action = "HOLD"
-                log_entry["action"] = "HOLD"
-                log_entry["message"] += f" [Veto: Sentimen Aktual {confidence/100.0:.2f} < Batas {sentiment_threshold}]"
-
-            sentix_state["aiBotLogs"].insert(0, log_entry)
-            sentix_state["aiBotLogs"] = sentix_state["aiBotLogs"][:100]
-            
-            # If decision is LONG or SHORT and confidence >= threshold, place trade in sentix_state
-            if decision in ["LONG", "SHORT"] and not veto_active and confidence >= threshold:
-                symbol_usdt = f"{target_asset}USDT"
-                
-                # UI Configuration Override (Mutlak)
-                lev_val = int(bot_settings.get("leverage", 10))
-                sl_pct = float(bot_settings.get("stopLossPct", 1.5))
-                tp_pct = float(bot_settings.get("takeProfitPct", 3.0))
-                
-                # Apply Multipliers
-                tp_pct *= float(bot_settings.get("tpMultiplier", 1.0))
-                sl_pct *= float(bot_settings.get("slMultiplier", 1.0))
-
-                # Determine Margin/Allocation and apply Martingale doubling if last closed trade was a loss
-                margin = float(bot_settings.get("allocationPerTrade", 1000.0))
-                if strategy == "MARTINGALE":
-                    closed_trades = [t for t in sentix_state.get("trades", []) if t.get("status") == "CLOSED"]
-                    if closed_trades:
-                        closed_trades.sort(key=lambda x: x.get("closeTime", 0) or x.get("exitTimestamp", 0) or 0, reverse=True)
-                        last_trade = closed_trades[0]
-                        last_pnl = last_trade.get("pnl", 0.0) or 0.0
-                        if last_pnl < 0.0:
-                            margin = margin * 2.0
-                            log_entry["message"] += f" [Martingale Double Active: ${margin}]"
-                            logger.info(f"[Martingale Strategy] Last trade was a loss (PnL: {last_pnl}%). Doubling allocation to ${margin}")
-
-                # Helper function to place a single trade object
-                def add_sentix_trade(trade_type, sl_val, tp_val, active_margin):
-                    qty = (active_margin * lev_val) / live_price
-                    trade_obj = {
-                        "id": f"trade-bot-{trade_type.lower()}-{int(time.time() * 1000)}",
-                        "symbol": symbol_usdt,
-                        "type": trade_type,
-                        "size": round(qty, 6),
-                        "leverage": lev_val,
-                        "entryPrice": live_price,
-                        "exitPrice": None,
-                        "pnl": None,
-                        "sl": round(sl_val, 2),
-                        "tp": round(tp_val, 2),
-                        "trailingStopPct": None,
-                        "status": "OPEN",
-                        "timestamp": int(time.time() * 1000),
-                        "exitTimestamp": None,
-                        "reason": f"AI_BOT_{strategy}"
-                    }
-                    if "trades" not in sentix_state:
-                        sentix_state["trades"] = []
-                    sentix_state["trades"].append(trade_obj)
-                    sentix_state["portfolio"]["balanceUSD"] = round(sentix_state["portfolio"]["balanceUSD"] - active_margin, 2)
-                    logger.info(f"[Sim Trading] Placed {strategy} trade: {trade_type} {symbol_usdt} at ${live_price}")
-
-                if strategy == "HEDGING":
-                    has_long = any(t.get("status") == "OPEN" and t.get("symbol") == symbol_usdt and t.get("type") == "BUY" for t in sentix_state["trades"])
-                    has_short = any(t.get("status") == "OPEN" and t.get("symbol") == symbol_usdt and t.get("type") == "SELL" for t in sentix_state["trades"])
-                    
-                    # Hedging SL/TP overrides (medium-tight to capture breakout moves)
-                    h_sl_pct = 1.5
-                    h_tp_pct = 3.0
-                    long_sl = live_price * (1 - h_sl_pct / 100)
-                    long_tp = live_price * (1 + h_tp_pct / 100)
-                    short_sl = live_price * (1 + h_sl_pct / 100)
-                    short_tp = live_price * (1 - h_tp_pct / 100)
-                    
-                    if not has_long:
-                        add_sentix_trade("BUY", long_sl, long_tp, margin)
-                    if not has_short:
-                        add_sentix_trade("SELL", short_sl, short_tp, margin)
-                else:
-                    if not any(t.get("status") == "OPEN" and t.get("symbol") == symbol_usdt for t in sentix_state["trades"]):
-                        trade_type = "BUY" if decision == "LONG" else "SELL"
-                        sl_price = live_price * (1 - sl_pct / 100) if decision == "LONG" else live_price * (1 + sl_pct / 100)
-                        tp_price = live_price * (1 + tp_pct / 100) if decision == "LONG" else live_price * (1 - tp_pct / 100)
-                        add_sentix_trade(trade_type, sl_price, tp_price, margin)
-            
-            _save_sentix_db()
-        except Exception as e:
-            logger.error(f"[Sim Trading] Failed to bridge log/trade to Sentix adapter: {e}")
-            
-        # Check if trade is valid and not vetoed
-        if decision in ["LONG", "SHORT"] and not veto_active:
-            if confidence >= threshold:
-                async with db_lock:
-                    db = await read_database_async()
-                    existing_trades = db.get("savedTrades", [])
-                    
-                cur_price = get_asset_current_price(target_asset)
-                if cur_price > 0.0:
-                    
-                    # UI Configuration Override (Mutlak) for DB Sync
-                    lev_val = int(bot_settings.get("leverage", 10))
-                    sl_pct = float(bot_settings.get("stopLossPct", 1.5))
-                    tp_pct = float(bot_settings.get("takeProfitPct", 3.0))
-                    
-                    # Apply Multipliers
-                    tp_pct *= float(bot_settings.get("tpMultiplier", 1.0))
-                    sl_pct *= float(bot_settings.get("slMultiplier", 1.0))
-
-                    def add_db_trade(trade_dec, sl_val, tp_val):
-                        sim_trade = {
-                            "id": f"trade-{trade_dec.lower()}-{int(time.time() * 1000)}",
-                            "timestamp": int(time.time() * 1000),
-                            "decision": trade_dec,
-                            "targetAsset": target_asset,
-                            "confidence": confidence,
-                            "recommendedLeverage": f"{lev_val}x",
-                            "recommendedStopLoss": f"{sl_pct}%",
-                            "recommendedTakeProfit": f"{tp_pct}%",
-                            "strategyReasoning": f"[{strategy} Strategy] {trade_decision.get('strategyReasoning', '')}",
-                            "status": "OPEN",
-                            "entryPrice": cur_price,
-                            "currentPrice": cur_price,
-                            "exitPrice": None,
-                            "closeTime": None,
-                            "closeReason": None,
-                            "pnl": 0.0,
-                            "headline": headline,
-                            "type": "SIMULATED"
-                        }
-                        
-                        if strategy == "HEDGING":
-                            sim_trade["recommendedStopLoss"] = "1.5%"
-                            sim_trade["recommendedTakeProfit"] = "3.0%"
-                            sim_trade["strategyReasoning"] = f"[HEDGING Strategy] Dual directional entry. {trade_decision.get('strategyReasoning', '')}"
-                        
-                        db["savedTrades"].insert(0, sim_trade)
-                        db["savedTrades"] = db["savedTrades"][:100]
-
-                    if strategy == "HEDGING":
-                        has_long_db = any(t.get("status") == "OPEN" and t.get("targetAsset") == target_asset and t.get("decision") == "LONG" and t.get("type") == "SIMULATED" for t in existing_trades)
-                        has_short_db = any(t.get("status") == "OPEN" and t.get("targetAsset") == target_asset and t.get("decision") == "SHORT" and t.get("type") == "SIMULATED" for t in existing_trades)
-                        
-                        async with db_lock:
-                            db = await read_database_async()
-                            if "savedTrades" not in db:
-                                db["savedTrades"] = []
-                            if not has_long_db:
-                                add_db_trade("LONG", cur_price * 0.985, cur_price * 1.03)
-                            if not has_short_db:
-                                add_db_trade("SHORT", cur_price * 1.015, cur_price * 0.97)
-                            await write_database_async(db)
-                    else:
-                        has_existing_db = any(t.get("status") == "OPEN" and t.get("targetAsset") == target_asset and t.get("type") == "SIMULATED" for t in existing_trades)
-                        if not has_existing_db:
-                            sl_price = cur_price * (1 - sl_pct / 100) if decision == "LONG" else cur_price * (1 + sl_pct / 100)
-                            tp_price = cur_price * (1 + tp_pct / 100) if decision == "LONG" else cur_price * (1 - tp_pct / 100)
-                            async with db_lock:
-                                db = await read_database_async()
-                                if "savedTrades" not in db:
-                                    db["savedTrades"] = []
-                                add_db_trade(decision, sl_price, tp_price)
-                                await write_database_async(db)
-                                
-                    logger.info(f"[Sim Trading] Successfully opened automated trade: {decision} {target_asset} at {cur_price}")
-                    
-                    # Send telegram alert
-                    from backend.services.telegram_client import send_telegram_alert
-                    msg = (
-                        f"🚀 *Simulated Trade Opened* 🚀\n\n"
-                        f"*Asset*: {target_asset}\n"
-                        f"*Action*: {decision}\n"
-                        f"*Entry Price*: ${cur_price}\n"
-                        f"*Confidence*: {confidence}%\n"
-                        f"*SL*: {sl_pct}% | *TP*: {tp_pct}%\n"
-                        f"*Reason*: {trade_decision.get('strategyReasoning', '')}"
-                    )
-                    asyncio.create_task(send_telegram_alert(msg))
     except Exception as err:
         logger.error(f"[Sim Trading] Error running automated trade: {err}")
+
 
 # Position monitor loop for simulated trades
 async def monitor_simulated_positions_loop():
@@ -532,10 +361,13 @@ async def monitor_simulated_positions_loop():
                         elif price_change_pct >= tp_pct:
                             triggered_close = True
                             close_reason = "TAKE_PROFIT"
-                        # 3. Timeout check (15 minutes)
-                        elif int(time.time() * 1000) - trade.get("timestamp", 0) > 15 * 60 * 1000:
-                            triggered_close = True
-                            close_reason = "TIMEOUT"
+                        # 3. Timeout check (Configurable)
+                        else:
+                            from backend.sentix_adapter import sentix_state
+                            max_hold_mins = int(sentix_state.get("aiBotSettings", {}).get("maxHoldMinutes", 0))
+                            if max_hold_mins > 0 and int(time.time() * 1000) - trade.get("timestamp", 0) > max_hold_mins * 60 * 1000:
+                                triggered_close = True
+                                close_reason = "TIMEOUT"
                             
                         if triggered_close:
                             trade["status"] = "CLOSED"
@@ -546,7 +378,7 @@ async def monitor_simulated_positions_loop():
                             # Also close matching trade in Sentix db.json
                             try:
                                 from backend.sentix_adapter import close_active_position_by_timestamp
-                                close_active_position_by_timestamp(trade.get("timestamp"), cur_price, close_reason)
+                                await close_active_position_by_timestamp(trade.get("timestamp"), cur_price, close_reason)
                             except Exception as sentix_err:
                                 logger.error(f"[Sim Position Monitor] Error closing Sentix trade: {sentix_err}")
                             
@@ -581,6 +413,81 @@ async def monitor_simulated_positions_loop():
             logger.error(f"[Sim Position Monitor] Error in loop: {loop_err}")
         await asyncio.sleep(10) # check every 10 seconds
 
+async def force_close_all_simulated_positions():
+    from backend.sentix_adapter import sentix_state, _save_sentix_db
+    from backend.database import db_lock, read_database_async, write_database_async
+    import time
+    
+    closed_count = 0
+    # 1. Close all sentix_state trades
+    if "trades" in sentix_state:
+        for trade in sentix_state["trades"]:
+            if trade.get("status") == "OPEN":
+                symbol = trade.get("symbol", "").replace("USDT", "")
+                cur_price = get_asset_current_price(symbol)
+                if cur_price <= 0:
+                    cur_price = trade.get("entryPrice", 0)
+                
+                trade["status"] = "CLOSED"
+                trade["exitPrice"] = cur_price
+                trade["exitTimestamp"] = int(time.time() * 1000)
+                trade["reason"] = "BOT_DISABLED"
+                
+                entry_price = trade.get("entryPrice", cur_price)
+                price_diff = (cur_price - entry_price) if trade.get("type") == "BUY" else (entry_price - cur_price)
+                raw_return = price_diff / entry_price if entry_price > 0 else 0
+                size = trade.get("size", 0)
+                leverage = trade.get("leverage", 1)
+                
+                fee = size * entry_price * 0.001
+                gross_pnl = raw_return * (size * entry_price)
+                net_pnl = gross_pnl - fee
+                trade["pnl"] = round(net_pnl, 2)
+                
+                margin_used = (size * entry_price) / leverage if leverage > 0 else 0
+                refund = margin_used + net_pnl
+                sentix_state["portfolio"]["balanceUSD"] = round(sentix_state["portfolio"].get("balanceUSD", 0) + refund, 2)
+                closed_count += 1
+        _save_sentix_db()
+        
+    # 2. Close all db.json savedTrades
+    updated = False
+    async with db_lock:
+        db = await read_database_async()
+        for sim_trade in db.get("savedTrades", []):
+            if sim_trade.get("status") == "OPEN" and sim_trade.get("type") == "SIMULATED":
+                symbol = sim_trade.get("targetAsset", "")
+                cur_price = get_asset_current_price(symbol)
+                if cur_price <= 0:
+                    cur_price = sim_trade.get("entryPrice", 0)
+                
+                sim_trade["status"] = "CLOSED"
+                sim_trade["exitPrice"] = cur_price
+                sim_trade["closeTime"] = int(time.time() * 1000)
+                sim_trade["closeReason"] = "BOT_DISABLED"
+                
+                entry_price = sim_trade.get("entryPrice", cur_price)
+                leverage_str = str(sim_trade.get("recommendedLeverage", "5x")).replace("x", "")
+                try:
+                    leverage = float(leverage_str)
+                except ValueError:
+                    leverage = 5.0
+                    
+                price_change_pct = ((cur_price - entry_price) / entry_price) * 100 if entry_price > 0 else 0
+                if sim_trade.get("decision") != "LONG":
+                    price_change_pct = -price_change_pct
+                sim_trade["pnl"] = round(price_change_pct * leverage, 2)
+                updated = True
+                
+        if updated:
+            await write_database_async(db)
+            
+    if closed_count > 0 or updated:
+        from backend.services.telegram_client import send_telegram_alert
+        import asyncio
+        asyncio.create_task(send_telegram_alert("🛑 *AI Bot Dimatikan* 🛑\nSemua posisi trading simulasi yang aktif telah ditutup secara paksa karena mode Strategy Automation dimatikan."))
+        logger.info(f"[AI Bot Loop] Force closed {closed_count} bot positions and matching db records.")
+
 # Background task to run AI bot automation strategy periodically when enabled
 async def ai_bot_automated_loop():
     logger.info("[AI Bot Loop] Starting automated strategy evaluation loop...")
@@ -605,6 +512,11 @@ async def ai_bot_automated_loop():
             settings_changed = (symbol != last_symbol) or (strategy != last_strategy)
             if (enabled and not last_enabled) or (enabled and settings_changed):
                 logger.info(f"[AI Bot Loop] Activation toggle or settings changed (Symbol: {symbol}, Strategy: {strategy}). Resetting throttle and evaluating immediately.")
+                last_run_time = 0
+                last_evaluated_key = None
+            elif not enabled and last_enabled:
+                logger.info("[AI Bot Loop] Bot disabled. Force closing all active positions...")
+                await force_close_all_simulated_positions()
                 last_run_time = 0
                 last_evaluated_key = None
                 
@@ -718,11 +630,14 @@ async def news_scraper_loop():
             logger.error(f"[Scraper] Error in news scraper loop: {e}")
         await asyncio.sleep(180) # Scrape every 3 minutes
 
+background_tasks = set()
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     # Initialize SQLite database
     await db_manager.init_db()
     # Start background tasks
+    global background_tasks
     sim_task = asyncio.create_task(market_simulation_loop())
     prices_task = asyncio.create_task(real_prices_loop())
     fng_task = asyncio.create_task(fear_and_greed_loop())
@@ -730,6 +645,8 @@ async def lifespan(app: FastAPI):
     ai_bot_task = asyncio.create_task(ai_bot_automated_loop())
     monitor_task = asyncio.create_task(monitor_binance_positions_loop())
     sim_monitor_task = asyncio.create_task(monitor_simulated_positions_loop())
+    
+    background_tasks.update([sim_task, prices_task, fng_task, scraper_task, ai_bot_task, monitor_task, sim_monitor_task])
     yield
     # Clean up background tasks
     sim_task.cancel()

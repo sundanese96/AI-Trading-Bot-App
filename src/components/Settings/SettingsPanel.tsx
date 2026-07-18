@@ -1,10 +1,11 @@
-import React from "react";
+import React, { useState } from "react";
 import { NotificationSettings, NotificationLog, LlmSettings } from "../../types";
+import { ApiDocsModal } from "./ApiDocsModal";
 import { NotificationConfig } from "./NotificationConfig";
 import { LlmConfig } from "./LlmConfig";
 import { BinanceConfig } from "./BinanceConfig";
 import { NotificationLogTable } from "./NotificationLogTable";
-import { HelpCircle } from "lucide-react";
+import { HelpCircle, BookOpen } from "lucide-react";
 import { apiConfig } from "../../api/client";
 
 interface SettingsPanelProps {
@@ -24,6 +25,7 @@ export function SettingsPanel({
   llmSettings,
   onSaveLlmSettings,
 }: SettingsPanelProps) {
+  const [isApiDocsOpen, setIsApiDocsOpen] = useState(false);
   
   // Wrap the API calls so components receive a Promise<boolean> and the main state is updated if we need it.
   const handleSaveSettings = async (payload: NotificationSettings) => {
@@ -134,10 +136,35 @@ export function SettingsPanel({
             </div>
           </div>
 
+          {/* Guide 3: API Gateway (Semburat) */}
+          <div className="bg-slate-900/60 backdrop-blur-md border border-slate-800/80 rounded-2xl p-6 shadow-2xl space-y-4 flex flex-col justify-between items-start">
+            <div>
+              <h4 className="font-sans font-bold text-white text-base flex items-center gap-2">
+                <BookOpen className="h-4 w-4 text-emerald-400" />
+                Panduan Semburat API Gateway
+              </h4>
+              <p className="text-xs text-slate-400 mt-2 leading-relaxed">
+                Pelajari integrasi *middleware* cerdas untuk meneruskan LLM secara lokal (Sync) maupun menggunakan Cloudflare Timeout Bypass (Async).
+              </p>
+            </div>
+            <button 
+              onClick={() => setIsApiDocsOpen(true)}
+              className="mt-4 flex items-center gap-2 bg-emerald-500/20 hover:bg-emerald-500/30 text-emerald-400 px-4 py-2 rounded-lg font-bold transition-colors w-full justify-center text-sm"
+            >
+              <BookOpen className="w-4 h-4" />
+              Buka Dokumentasi Lengkap
+            </button>
+          </div>
+
         </div>
       </div>
 
       <NotificationLogTable logs={logs} />
+      
+      <ApiDocsModal 
+        isOpen={isApiDocsOpen} 
+        onClose={() => setIsApiDocsOpen(false)} 
+      />
     </div>
   );
 }

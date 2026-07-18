@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { MLModel } from "../types";
 import { ResponsiveContainer, LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip as ChartTooltip } from "recharts";
 import { Cpu, BrainCircuit, Play, CheckCircle2, ChevronRight, HelpCircle, Sparkles } from "lucide-react";
@@ -61,6 +61,14 @@ export function MLPanel({ onTrainModel, onGetForecast, savedModels }: MLPanelPro
     }
   };
 
+  useEffect(() => {
+    return () => {
+      if ((window as any)._mlPanelInterval) {
+        clearInterval((window as any)._mlPanelInterval);
+      }
+    };
+  }, []);
+
   const handleTrainLocalModel = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsTraining(true);
@@ -69,7 +77,7 @@ export function MLPanel({ onTrainModel, onGetForecast, savedModels }: MLPanelPro
     setCurrentEpoch(0);
 
     try {
-const response = await onTrainModel({
+      const response = await onTrainModel({
         modelType,
         learningRate,
         epochs,
@@ -77,14 +85,14 @@ const response = await onTrainModel({
         symbol,
       });
 
-      // Animate epoch cycles progress bar in the UI to give an excellent high-fidelity training visual!
       const totalEpochs = response.lossHistory.length;
       let i = 0;
+      
       const interval = setInterval(() => {
         if (i < totalEpochs) {
           setTrainingLoss(response.lossHistory.slice(0, i + 1));
           setCurrentEpoch(response.lossHistory[i].epoch);
-          i += Math.max(1, Math.floor(totalEpochs / 30)); // step sizing
+          i += Math.max(1, Math.floor(totalEpochs / 30)); 
         } else {
           setTrainingLoss(response.lossHistory);
           setCurrentEpoch(response.lossHistory[totalEpochs - 1].epoch);
@@ -97,10 +105,12 @@ const response = await onTrainModel({
           clearInterval(interval);
         }
       }, 35);
+      
+      // Store interval globally for cleanup on unmount
+      (window as any)._mlPanelInterval = interval;
     } catch (err: any) {
       alert(err.message || "Gagal melatih model lokal.");
       setIsTraining(false);
-      // FIX: clearInterval not needed here since interval was never set
     }
   };
 

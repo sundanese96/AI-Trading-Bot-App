@@ -1,8 +1,6 @@
 import httpx
-import xml.etree.ElementTree as ET
 from bs4 import BeautifulSoup
 from typing import List, Dict, Any
-import os
 import json
 import time
 from pathlib import Path

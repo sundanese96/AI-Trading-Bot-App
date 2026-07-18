@@ -99,8 +99,8 @@ export function CryptoTicker({ onSelectCoin, selectedCoin }: CryptoTickerProps) 
     return () => {
       clearInterval(interval);
       clearInterval(fngInterval);
-      // Clean up any pending timeouts
-      Object.values(flashTimeouts.current).forEach(clearTimeout);
+      // Clean up any pending timeouts to prevent memory leaks
+      Object.values(flashTimeouts.current).forEach(t => clearTimeout(t));
     };
   }, []);
 

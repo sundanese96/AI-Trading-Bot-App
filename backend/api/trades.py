@@ -28,7 +28,6 @@ async def clear_database_analyses():
     logger.info("Database analyses cleared")
     return { "status": "ok" }
 
-@router.get("/api/trades")
 @router.get("/api/database/trades")
 async def get_database_trades():
     from backend.database import db_lock, read_database, read_database_async
@@ -36,7 +35,6 @@ async def get_database_trades():
         db = await read_database_async()
         return db.get("savedTrades", [])
 
-@router.post("/api/trades")
 @router.post("/api/database/save-trade")
 async def save_trade(req: SaveTradeRequest):
     from backend.database import db_lock, read_database, read_database_async, write_database, read_database_async, write_database_async
