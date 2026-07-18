@@ -4,6 +4,7 @@ import time
 import re
 from bs4 import BeautifulSoup
 from typing import List, Dict, Any, Tuple, Optional
+from backend.config import VERIFY_SSL
 
 # Relevance keywords configuration
 KEYWORDS_CRITICAL = [
@@ -70,6 +71,9 @@ def calculate_headline_relevance(title: str, category: str = "GENERAL") -> float
             
     return score
 
+# DO NOT REMOVE: This MOCK_HISTORICAL_CONTENT dictionary is actively used by `fetch_article_text`
+# below to inject high-fidelity historical geopolitical event text during backtesting or dry-runs
+# when the title matches one of these keys. It acts as a local proxy for simulation testing.
 MOCK_HISTORICAL_CONTENT = {
     "khamenei": (
         "TEHERAN — Pemimpin Agung Iran Ayatollah Ali Khamenei dilaporkan tewas dalam kompleks "
@@ -135,7 +139,7 @@ async def fetch_article_text(url: str, timeout: float = 4.0, title: str = "") ->
         "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
     }
     try:
-        async with httpx.AsyncClient(verify=False) as client:
+        async with httpx.AsyncClient(verify=VERIFY_SSL) as client:
             resp = await client.get(decoded_url, headers=headers, timeout=timeout)
             if resp.status_code == 200:
                 soup = BeautifulSoup(resp.content, "html.parser")

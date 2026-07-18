@@ -1,3 +1,4 @@
+from backend.core.logger import logger
 import time
 import httpx
 import asyncio
@@ -12,7 +13,7 @@ from pydantic import BaseModel
 from typing import Optional, List, Dict, Any
 
 from backend.config import GEMINI_API_KEY, OPENAI_API_KEY, ANTHROPIC_API_KEY, CUSTOM_AI_KEY, PORT, HOST, DASHBOARD_USERNAME, DASHBOARD_PASSWORD, BASE_DIR
-from backend.database import read_database, write_database
+from backend.database import read_database, write_database, read_database_async, write_database_async
 from backend.services import db_manager
 from backend.services.historical_scraper import scrape_google_news_historical
 from backend.services.market import (
@@ -28,6 +29,14 @@ from backend.services.ml.evaluator import predict_live, evaluate_model_performan
 from backend.services.ml.data_prep import prepare_training_data
 
 llm_response_cache = {}
+_llm_lock = None
+
+def get_llm_lock():
+    global _llm_lock
+    if _llm_lock is None:
+        import asyncio
+        _llm_lock = asyncio.Lock()
+    return _llm_lock
 
 # Helper to get real-time price from Binance or simulation
 def get_asset_current_price(symbol: str) -> float:
@@ -42,6 +51,40 @@ def is_headline_relevant(headline: str, source: str) -> bool:
     # Pre-filtered sources are always relevant
     if source in ["CryptoPanic RSS", "ForexFactory Calendar", "System Indicator"]:
         return True
+    
+    # Fast regex keyword scan for relevance to Crypto/Macro/Geopolitics
+    hl_lower = headline.lower()
+    finance_keywords = [
+        'bitcoin', 'crypto', 'sec', 'etf', 'binance', 'coinbase', 'cpi', 'nfp', 'fomc', 
+        'fed', 'rate', 'inflation', 'gdp', 'economy', 'market', 'stock', 'wall street'
+    ]
+    # Geopolitical and Conflict keywords (having potential macro/market impact)
+    geopolitics_keywords = [
+        'war', 'strike', 'attack', 'missile', 'military', 'sanction', 'nuclear', 'conflict', 
+        'perang', 'rudal', 'militer', 'bom', 'sanksi', 'konflik', 'serangan', 'geopolitical', 
+        'tariff', 'china', 'russia', 'ukraine', 'iran', 'israel', 'gaza', 'border', 'clash', 
+        'treaty', 'alliance', 'summit', 'nato', 'defense'
+    ]
+    
+    if any(k in hl_lower for k in finance_keywords) or any(k in hl_lower for k in geopolitics_keywords):
+        return True
+        
+    return False
+
+import difflib
+
+def is_headline_duplicate(new_headline: str, feed: list, threshold: float = 0.8) -> bool:
+    new_lower = new_headline.lower()
+    for n in feed:
+        existing = n.get("headline", "")
+        if existing == new_headline:
+            return True
+        
+        # Calculate string similarity ratio
+        sim = difflib.SequenceMatcher(None, new_lower, existing.lower()).ratio()
+        if sim >= threshold:
+            return True
+    return False
         
     hl_lower = headline.lower()
     
@@ -73,14 +116,14 @@ def is_headline_relevant(headline: str, source: str) -> bool:
 
 # Trigger simulated trade in paper trading mode
 async def trigger_automated_trade_sim(item: Dict[str, Any], config: Dict[str, Any]):
-    from backend.database import db_lock, read_database, write_database
+    from backend.database import db_lock, read_database, read_database_async, write_database, read_database_async, write_database_async
     try:
         headline = item["title"]
         source = item.get("source", "Unknown")
         
         # Check relevance to avoid wasting local LLM resources and flooding activity console
         if not is_headline_relevant(headline, source):
-            print(f"[Sim Trading] Skipping LLM for irrelevant headline: {headline}")
+            logger.info(f"[Sim Trading] Skipping LLM for irrelevant headline: {headline}")
             # Insert into news_feed directly without running LLM to keep general news panel updated
             sentiment_res = analyze_sentiment(headline)
             score = sentiment_res["score"]
@@ -93,7 +136,7 @@ async def trigger_automated_trade_sim(item: Dict[str, Any], config: Dict[str, An
             impact = "CRITICAL" if (is_geo or is_macro) else "NEUTRAL"
             
             # Check if already in news_feed to prevent duplicates
-            if not any(n["headline"] == headline for n in news_feed):
+            if not is_headline_duplicate(headline, news_feed):
                 new_item = {
                     "id": f"news-{int(time.time() * 1000)}",
                     "time": time.strftime("%H:%M:%S"),
@@ -118,7 +161,7 @@ async def trigger_automated_trade_sim(item: Dict[str, Any], config: Dict[str, An
         active_symbol = bot_settings.get("symbol", "BTCUSDT")
         active_asset = active_symbol.upper().replace("USDT", "")
         
-        print(f"[Sim Trading] Auto-running AI analysis for: {headline} (Target Asset: {active_asset})")
+        logger.info(f"[Sim Trading] Auto-running AI analysis for: {headline} (Target Asset: {active_asset})")
         
         # Call analyze_ai to enrich news, calculate volatilities, classify crisis, and update news_feed
         req = AIAnalyzeRequest(
@@ -248,6 +291,14 @@ async def trigger_automated_trade_sim(item: Dict[str, Any], config: Dict[str, An
             
             if "aiBotLogs" not in sentix_state:
                 sentix_state["aiBotLogs"] = []
+
+            sentiment_threshold = float(bot_settings.get("sentimentThreshold", 0.0))
+            if decision in ["LONG", "SHORT"] and (confidence / 100.0) < sentiment_threshold:
+                decision = "HOLD"
+                log_action = "HOLD"
+                log_entry["action"] = "HOLD"
+                log_entry["message"] += f" [Veto: Sentimen Aktual {confidence/100.0:.2f} < Batas {sentiment_threshold}]"
+
             sentix_state["aiBotLogs"].insert(0, log_entry)
             sentix_state["aiBotLogs"] = sentix_state["aiBotLogs"][:100]
             
@@ -255,29 +306,14 @@ async def trigger_automated_trade_sim(item: Dict[str, Any], config: Dict[str, An
             if decision in ["LONG", "SHORT"] and not veto_active and confidence >= threshold:
                 symbol_usdt = f"{target_asset}USDT"
                 
-                # Standard default parameters
-                lev_val = 5
-                try:
-                    lev_val = int(trade_decision.get("recommendedLeverage", "5x").replace("x", ""))
-                except Exception:
-                    pass
-                    
-                sl_str = trade_decision.get("recommendedStopLoss", "2.5%").replace("%", "")
-                try:
-                    sl_pct = float(sl_str)
-                except ValueError:
-                    sl_pct = 2.5
-                tp_pct = sl_pct * 2.0
-
-                # Override params based on strategy
-                if strategy == "SCALPING":
-                    lev_val = 20
-                    sl_pct = 0.8
-                    tp_pct = 1.5
-                elif strategy == "SWING":
-                    lev_val = 3
-                    sl_pct = 4.0
-                    tp_pct = 10.0
+                # UI Configuration Override (Mutlak)
+                lev_val = int(bot_settings.get("leverage", 10))
+                sl_pct = float(bot_settings.get("stopLossPct", 1.5))
+                tp_pct = float(bot_settings.get("takeProfitPct", 3.0))
+                
+                # Apply Multipliers
+                tp_pct *= float(bot_settings.get("tpMultiplier", 1.0))
+                sl_pct *= float(bot_settings.get("slMultiplier", 1.0))
 
                 # Determine Margin/Allocation and apply Martingale doubling if last closed trade was a loss
                 margin = float(bot_settings.get("allocationPerTrade", 1000.0))
@@ -290,7 +326,7 @@ async def trigger_automated_trade_sim(item: Dict[str, Any], config: Dict[str, An
                         if last_pnl < 0.0:
                             margin = margin * 2.0
                             log_entry["message"] += f" [Martingale Double Active: ${margin}]"
-                            print(f"[Martingale Strategy] Last trade was a loss (PnL: {last_pnl}%). Doubling allocation to ${margin}")
+                            logger.info(f"[Martingale Strategy] Last trade was a loss (PnL: {last_pnl}%). Doubling allocation to ${margin}")
 
                 # Helper function to place a single trade object
                 def add_sentix_trade(trade_type, sl_val, tp_val, active_margin):
@@ -316,7 +352,7 @@ async def trigger_automated_trade_sim(item: Dict[str, Any], config: Dict[str, An
                         sentix_state["trades"] = []
                     sentix_state["trades"].append(trade_obj)
                     sentix_state["portfolio"]["balanceUSD"] = round(sentix_state["portfolio"]["balanceUSD"] - active_margin, 2)
-                    print(f"[Sim Trading] Placed {strategy} trade: {trade_type} {symbol_usdt} at ${live_price}")
+                    logger.info(f"[Sim Trading] Placed {strategy} trade: {trade_type} {symbol_usdt} at ${live_price}")
 
                 if strategy == "HEDGING":
                     has_long = any(t.get("status") == "OPEN" and t.get("symbol") == symbol_usdt and t.get("type") == "BUY" for t in sentix_state["trades"])
@@ -343,40 +379,26 @@ async def trigger_automated_trade_sim(item: Dict[str, Any], config: Dict[str, An
             
             _save_sentix_db()
         except Exception as e:
-            print(f"[Sim Trading] Failed to bridge log/trade to Sentix adapter: {e}")
+            logger.error(f"[Sim Trading] Failed to bridge log/trade to Sentix adapter: {e}")
             
         # Check if trade is valid and not vetoed
         if decision in ["LONG", "SHORT"] and not veto_active:
             if confidence >= threshold:
                 async with db_lock:
-                    db = read_database()
+                    db = await read_database_async()
                     existing_trades = db.get("savedTrades", [])
                     
                 cur_price = get_asset_current_price(target_asset)
                 if cur_price > 0.0:
                     
-                    # Standard default parameters (again for db sync)
-                    lev_val = 5
-                    try:
-                        lev_val = int(trade_decision.get("recommendedLeverage", "5x").replace("x", ""))
-                    except Exception:
-                        pass
-                        
-                    sl_str = trade_decision.get("recommendedStopLoss", "2.5%").replace("%", "")
-                    try:
-                        sl_pct = float(sl_str)
-                    except ValueError:
-                        sl_pct = 2.5
-                    tp_pct = sl_pct * 2.0
-
-                    if strategy == "SCALPING":
-                        lev_val = 20
-                        sl_pct = 0.8
-                        tp_pct = 1.5
-                    elif strategy == "SWING":
-                        lev_val = 3
-                        sl_pct = 4.0
-                        tp_pct = 10.0
+                    # UI Configuration Override (Mutlak) for DB Sync
+                    lev_val = int(bot_settings.get("leverage", 10))
+                    sl_pct = float(bot_settings.get("stopLossPct", 1.5))
+                    tp_pct = float(bot_settings.get("takeProfitPct", 3.0))
+                    
+                    # Apply Multipliers
+                    tp_pct *= float(bot_settings.get("tpMultiplier", 1.0))
+                    sl_pct *= float(bot_settings.get("slMultiplier", 1.0))
 
                     def add_db_trade(trade_dec, sl_val, tp_val):
                         sim_trade = {
@@ -413,27 +435,27 @@ async def trigger_automated_trade_sim(item: Dict[str, Any], config: Dict[str, An
                         has_short_db = any(t.get("status") == "OPEN" and t.get("targetAsset") == target_asset and t.get("decision") == "SHORT" and t.get("type") == "SIMULATED" for t in existing_trades)
                         
                         async with db_lock:
-                            db = read_database()
+                            db = await read_database_async()
                             if "savedTrades" not in db:
                                 db["savedTrades"] = []
                             if not has_long_db:
                                 add_db_trade("LONG", cur_price * 0.985, cur_price * 1.03)
                             if not has_short_db:
                                 add_db_trade("SHORT", cur_price * 1.015, cur_price * 0.97)
-                            write_database(db)
+                            await write_database_async(db)
                     else:
                         has_existing_db = any(t.get("status") == "OPEN" and t.get("targetAsset") == target_asset and t.get("type") == "SIMULATED" for t in existing_trades)
                         if not has_existing_db:
                             sl_price = cur_price * (1 - sl_pct / 100) if decision == "LONG" else cur_price * (1 + sl_pct / 100)
                             tp_price = cur_price * (1 + tp_pct / 100) if decision == "LONG" else cur_price * (1 - tp_pct / 100)
                             async with db_lock:
-                                db = read_database()
+                                db = await read_database_async()
                                 if "savedTrades" not in db:
                                     db["savedTrades"] = []
                                 add_db_trade(decision, sl_price, tp_price)
-                                write_database(db)
+                                await write_database_async(db)
                                 
-                    print(f"[Sim Trading] Successfully opened automated trade: {decision} {target_asset} at {cur_price}")
+                    logger.info(f"[Sim Trading] Successfully opened automated trade: {decision} {target_asset} at {cur_price}")
                     
                     # Send telegram alert
                     from backend.services.telegram_client import send_telegram_alert
@@ -448,18 +470,18 @@ async def trigger_automated_trade_sim(item: Dict[str, Any], config: Dict[str, An
                     )
                     asyncio.create_task(send_telegram_alert(msg))
     except Exception as err:
-        print(f"[Sim Trading] Error running automated trade: {err}")
+        logger.error(f"[Sim Trading] Error running automated trade: {err}")
 
 # Position monitor loop for simulated trades
 async def monitor_simulated_positions_loop():
-    print("[Sim Position Monitor] Starting simulated position monitor loop...")
+    logger.info("[Sim Position Monitor] Starting simulated position monitor loop...")
     while True:
         try:
-            from backend.database import db_lock, read_database, write_database
+            from backend.database import db_lock, read_database, read_database_async, write_database, read_database_async, write_database_async
             import time
             
             async with db_lock:
-                db = read_database()
+                db = await read_database_async()
                 trades = db.get("savedTrades", [])
                 updated = False
                 
@@ -484,7 +506,11 @@ async def monitor_simulated_positions_loop():
                         except ValueError:
                             sl_pct = 2.0
                         
-                        tp_pct = sl_pct * 2.0
+                        tp_str = str(trade.get("recommendedTakeProfit", f"{sl_pct * 2.0}%")).replace("%", "")
+                        try:
+                            tp_pct = float(tp_str)
+                        except ValueError:
+                            tp_pct = sl_pct * 2.0
                         decision = trade.get("decision")
                         
                         if decision == "LONG":
@@ -522,7 +548,7 @@ async def monitor_simulated_positions_loop():
                                 from backend.sentix_adapter import close_active_position_by_timestamp
                                 close_active_position_by_timestamp(trade.get("timestamp"), cur_price, close_reason)
                             except Exception as sentix_err:
-                                print(f"[Sim Position Monitor] Error closing Sentix trade: {sentix_err}")
+                                logger.error(f"[Sim Position Monitor] Error closing Sentix trade: {sentix_err}")
                             
                             # Append to pnlLog for rolling daily stats
                             if "pnlLog" not in db:
@@ -544,20 +570,20 @@ async def monitor_simulated_positions_loop():
                                 f"*Headline*: {trade.get('headline', '')}"
                             )
                             asyncio.create_task(send_telegram_alert(closed_msg))
-                            print(f"[Sim Position Monitor] CLOSED POSITION: {decision} {symbol} at {cur_price} | PnL: {pnl_pct:.2f}%")
+                            logger.info(f"[Sim Position Monitor] CLOSED POSITION: {decision} {symbol} at {cur_price} | PnL: {pnl_pct:.2f}%")
                             
                         updated = True
                         
                 if updated:
-                    write_database(db)
+                    await write_database_async(db)
                     
         except Exception as loop_err:
-            print(f"[Sim Position Monitor] Error in loop: {loop_err}")
+            logger.error(f"[Sim Position Monitor] Error in loop: {loop_err}")
         await asyncio.sleep(10) # check every 10 seconds
 
 # Background task to run AI bot automation strategy periodically when enabled
 async def ai_bot_automated_loop():
-    print("[AI Bot Loop] Starting automated strategy evaluation loop...")
+    logger.info("[AI Bot Loop] Starting automated strategy evaluation loop...")
     import time
     from backend.sentix_adapter import sentix_state
     from backend.database import load_ai_config
@@ -578,7 +604,7 @@ async def ai_bot_automated_loop():
             # Detect activation toggle or setting changes
             settings_changed = (symbol != last_symbol) or (strategy != last_strategy)
             if (enabled and not last_enabled) or (enabled and settings_changed):
-                print(f"[AI Bot Loop] Activation toggle or settings changed (Symbol: {symbol}, Strategy: {strategy}). Resetting throttle and evaluating immediately.")
+                logger.info(f"[AI Bot Loop] Activation toggle or settings changed (Symbol: {symbol}, Strategy: {strategy}). Resetting throttle and evaluating immediately.")
                 last_run_time = 0
                 last_evaluated_key = None
                 
@@ -614,11 +640,11 @@ async def ai_bot_automated_loop():
                     
                     # Run automated trade simulation step
                     dummy_item = {"title": headline, "source": source}
-                    print(f"[AI Bot Loop] Strategy automation triggered for headline: {headline}")
+                    logger.info(f"[AI Bot Loop] Strategy automation triggered for headline: {headline}")
                     await trigger_automated_trade_sim(dummy_item, config)
                     
         except Exception as e:
-            print(f"[AI Bot Loop] Error: {e}")
+            logger.error(f"[AI Bot Loop] Error: {e}")
             
         await asyncio.sleep(5) # check if bot is enabled every 5 seconds
 
@@ -627,7 +653,7 @@ async def news_scraper_loop():
     global news_feed
     while True:
         try:
-            print("[Scraper] Running periodic news scraper...")
+            logger.info("[Scraper] Running periodic news scraper...")
             reuters_news = await scrape_reuters_news()
             bbc_news = await scrape_bbc_news()
             ff_news = await fetch_forexfactory_calendar()
@@ -649,7 +675,7 @@ async def news_scraper_loop():
             for item in all_scraped:
                 headline = item["title"]
                 # Check if headline already exists in news_feed to avoid duplicates
-                if any(n["headline"] == headline for n in news_feed):
+                if is_headline_duplicate(headline, news_feed):
                     continue
                 
                 # Check and run live simulation manager if active
@@ -689,7 +715,7 @@ async def news_scraper_loop():
                     if len(news_feed) > 50:
                         news_feed.pop()
         except Exception as e:
-            print(f"[Scraper] Error in news scraper loop: {e}")
+            logger.error(f"[Scraper] Error in news scraper loop: {e}")
         await asyncio.sleep(180) # Scrape every 3 minutes
 
 @asynccontextmanager
@@ -717,6 +743,14 @@ async def lifespan(app: FastAPI):
         await asyncio.gather(sim_task, prices_task, fng_task, scraper_task, monitor_task, sim_monitor_task, return_exceptions=True)
     except Exception:
         pass
+    
+    # Close shared AI HTTP client
+    try:
+        from backend.services.ai import _shared_client
+        if _shared_client:
+            await _shared_client.aclose()
+    except Exception as e:
+        logger.error(f"[Shutdown] Error closing AI client: {e}")
 
 app = FastAPI(title="Sentix AI Trading Terminal", lifespan=lifespan)
 
@@ -738,84 +772,18 @@ async def add_cache_control_header(request: Request, call_next):
         response.headers["Expires"] = "0"
     return response
 
-# Persistent Session Management
-SESSION_FILE = str(BASE_DIR / ".session_token")
 
-def get_active_session_id():
-    import os
-    if os.path.exists(SESSION_FILE):
-        try:
-            with open(SESSION_FILE, "r") as f:
-                return f.read().strip()
-        except Exception:
-            return None
-    return None
+from backend.api.auth import router as auth_router
+app.include_router(auth_router)
 
-def set_active_session_id(session_id: str):
-    try:
-        with open(SESSION_FILE, "w") as f:
-            f.write(session_id)
-    except Exception as e:
-        print(f"Error saving session token: {e}")
+from backend.api.market import router as market_router
+app.include_router(market_router)
 
-def clear_active_session_id():
-    import os
-    if os.path.exists(SESSION_FILE):
-        try:
-            os.remove(SESSION_FILE)
-        except Exception as e:
-            print(f"Error removing session token: {e}")
+from backend.api.simulation import router as simulation_router
+app.include_router(simulation_router)
 
-class LoginRequest(BaseModel):
-    username: str
-    password: str
-
-@app.middleware("http")
-async def auth_middleware(request: Request, call_next):
-    path = request.url.path
-    
-    if path.startswith("/api"):
-        if path not in ["/api/login", "/api/auth/status"]:
-            session_id = request.cookies.get("session_id")
-            active_id = get_active_session_id()
-            if not session_id or session_id != active_id:
-                from fastapi.responses import JSONResponse
-                return JSONResponse(status_code=401, content={"detail": "Unauthorized"})
-                
-    response = await call_next(request)
-    return response
-
-@app.post("/api/login")
-async def login(data: LoginRequest, response: Response):
-    if data.username == DASHBOARD_USERNAME and data.password == DASHBOARD_PASSWORD:
-        import uuid
-        session_id = uuid.uuid4().hex
-        set_active_session_id(session_id)
-        response.set_cookie(
-            key="session_id",
-            value=session_id,
-            httponly=True,
-            samesite="lax",
-            max_age=3600 * 24 * 7, # 7 days
-            path="/"
-        )
-        return {"success": True}
-    else:
-        raise HTTPException(status_code=400, detail="Username atau password salah")
-
-@app.get("/api/auth/status")
-async def auth_status(request: Request):
-    session_id = request.cookies.get("session_id")
-    active_id = get_active_session_id()
-    if session_id and session_id == active_id:
-        return {"authenticated": True}
-    return {"authenticated": False}
-
-@app.post("/api/logout")
-async def logout(response: Response):
-    clear_active_session_id()
-    response.delete_cookie(key="session_id", path="/")
-    return {"success": True}
+from backend.api.trades import router as trades_router
+app.include_router(trades_router)
 
 # Register Sentix UI compatibility adapter routes (takes priority)
 from backend.sentix_adapter import router as sentix_router
@@ -931,141 +899,6 @@ async def execute_order_endpoint(req: ExecuteOrderRequest):
         raise HTTPException(status_code=400, detail=res.get("message"))
     return res
 
-@app.get("/api/market-data")
-async def get_market_data():
-    return {
-        "assets": assets,
-        "panic": current_panic,
-        "time": time.strftime("%Y-%m-%dT%H:%M:%S.000Z", time.gmtime())
-    }
-
-@app.get("/api/market/correlations")
-async def get_market_correlations():
-    from backend.services.market import assets, calculate_pearson_correlation
-    target_symbols = ["BTC", "ETH", "SOL", "BNB", "XRP", "ADA", "SUI", "DOGE"]
-    
-    histories = {}
-    for a in assets:
-        sym = a["symbol"].upper()
-        if sym in target_symbols:
-            histories[sym] = a["history"]
-            
-    matrix = {}
-    for sym_a in target_symbols:
-        matrix[sym_a] = {}
-        for sym_b in target_symbols:
-            if sym_a == sym_b:
-                matrix[sym_a][sym_b] = 1.0
-            else:
-                hist_a = histories.get(sym_a, [])
-                hist_b = histories.get(sym_b, [])
-                r = calculate_pearson_correlation(hist_a, hist_b)
-                matrix[sym_a][sym_b] = round(r, 2)
-                
-    return {
-        "matrix": matrix
-    }
-
-@app.get("/api/fear-and-greed")
-async def get_fear_and_greed():
-    return fng_cache
-
-class StartSessionRequest(BaseModel):
-    strategy: str
-    initialCapital: float
-    targetAssets: List[str]
-    confidenceThreshold: Optional[int] = 75
-    bollingerStdDev: Optional[float] = 2.0
-
-@app.post("/api/live-sim/start")
-async def start_live_sim_session(req: StartSessionRequest):
-    from backend.services.live_sim_manager import live_sim_manager
-    await live_sim_manager.start_session(
-        strategy=req.strategy,
-        initial_capital=req.initialCapital,
-        target_assets=req.targetAssets,
-        confidence_threshold=req.confidenceThreshold,
-        bollinger_std_dev=req.bollingerStdDev
-    )
-    return {
-        "status": "success",
-        "message": f"Simulation session started with strategy {req.strategy}"
-    }
-
-@app.post("/api/live-sim/stop")
-async def stop_live_sim_session():
-    from backend.services.live_sim_manager import live_sim_manager
-    await live_sim_manager.stop_session()
-    return {
-        "status": "success",
-        "message": "Simulation session stopped"
-    }
-
-@app.get("/api/live-sim/status")
-async def get_live_sim_status():
-    from backend.services.live_sim_manager import live_sim_manager
-    return {
-        "active": live_sim_manager.active,
-        "strategy": live_sim_manager.strategy,
-        "initialCapital": live_sim_manager.initial_capital,
-        "currentCapital": live_sim_manager.current_capital,
-        "targetAssets": live_sim_manager.target_assets,
-        "confidenceThreshold": getattr(live_sim_manager, "confidence_threshold", 75),
-        "bollingerStdDev": getattr(live_sim_manager, "bollinger_std_dev", 2.0),
-        "startTime": live_sim_manager.start_time,
-        "elapsedTime": time.time() - live_sim_manager.start_time if live_sim_manager.active else 0,
-        "logs": live_sim_manager.logs
-    }
-
-@app.get("/api/live-sim/trades")
-async def get_live_sim_trades():
-    from backend.services.live_sim_manager import live_sim_manager
-    return live_sim_manager.trades
-
-@app.get("/api/analyses")
-@app.get("/api/database/analyses")
-async def get_database_analyses():
-    from backend.database import db_lock, read_database
-    async with db_lock:
-        db = read_database()
-        return db.get("savedAnalyses", [])
-
-@app.post("/api/analyses/clear")
-@app.post("/api/database/clear")
-async def clear_database_analyses():
-    from backend.database import db_lock, read_database, write_database
-    async with db_lock:
-        db = read_database()
-        db["savedAnalyses"] = []
-        write_database(db)
-    return { "status": "ok" }
-
-@app.get("/api/trades")
-@app.get("/api/database/trades")
-async def get_database_trades():
-    from backend.database import db_lock, read_database
-    async with db_lock:
-        db = read_database()
-        return db.get("savedTrades", [])
-
-@app.post("/api/trades")
-@app.post("/api/database/save-trade")
-async def save_trade(req: SaveTradeRequest):
-    from backend.database import db_lock, read_database, write_database
-    async with db_lock:
-        db = read_database()
-        if "savedTrades" not in db:
-            db["savedTrades"] = []
-        trade_data = {
-            **req.trade,
-            "id": f"trade-{int(time.time() * 1000)}",
-            "timestamp": int(time.time() * 1000)
-        }
-        db["savedTrades"].insert(0, trade_data)
-        db["savedTrades"] = db["savedTrades"][:100]
-        write_database(db)
-    return { "status": "ok", "trade": trade_data }
-
 # ML Model Endpoints
 
 class MLTrainRequest(BaseModel):
@@ -1101,9 +934,9 @@ async def train_ml_model_endpoint(req: MLTrainRequest, background_tasks: Backgro
 
 @app.get("/api/ml/metrics")
 async def get_ml_metrics():
-    from backend.database import db_lock, read_database
+    from backend.database import db_lock, read_database, read_database_async
     async with db_lock:
-        db = read_database()
+        db = await read_database_async()
         return db.get("mlMetrics", { "status": "idle" })
 
 @app.post("/api/ml/predict")
@@ -1230,7 +1063,7 @@ async def analyze_ai(req: AIAnalyzeRequest):
     use_fallback = has_no_key and (req.provider not in ["custom", "semburat"] or not req.customUrl)
 
     if use_fallback:
-        print(f"No API key provided for {req.provider}. Using high-fidelity local fallback classifier.")
+        logger.info(f"No API key provided for {req.provider}. Using high-fidelity local fallback classifier.")
         lower = req.headline.lower()
         
         # Check geopolitical indicators
@@ -1318,7 +1151,7 @@ async def analyze_ai(req: AIAnalyzeRequest):
 
         # Save fallback to database
         try:
-            db = read_database()
+            db = await read_database_async()
             if "savedAnalyses" not in db:
                 db["savedAnalyses"] = []
             db["savedAnalyses"].insert(0, {
@@ -1335,9 +1168,9 @@ async def analyze_ai(req: AIAnalyzeRequest):
                 }
             })
             db["savedAnalyses"] = db["savedAnalyses"][:50]
-            write_database(db)
+            await write_database_async(db)
         except Exception as db_err:
-            print(f"[DATABASE] Failed to save fallback analysis: {db_err}")
+            logger.error(f"[DATABASE] Failed to save fallback analysis: {db_err}")
 
         return {
             "fallback": True,
@@ -1480,7 +1313,7 @@ Kembalikan respons dalam format JSON dengan struktur persis seperti berikut:
                     f"    Respon Lilin BTCUSDT: 15m={pct_15m} | 1h={pct_1h} | 4h={pct_4h}"
                 )
     except Exception as db_err:
-        print(f"[RAG Live] Failed to fetch analogies: {db_err}")
+        logger.error(f"[RAG Live] Failed to fetch analogies: {db_err}")
 
     analogies_context = "\n".join(analogies_context_list) if analogies_context_list else "Tidak ditemukan kejadian serupa ber-analog respon pasar di database historis."
 
@@ -1534,86 +1367,88 @@ Gunakan data real-time, volatilitas pasar, sentimen berita, indeks Fear & Greed,
         # Cache key based on provider, model and headline (to prevent token waste)
         cache_key = (req.provider, used_model, req.headline)
         
-        # Check cache
-        if cache_key in llm_response_cache:
-            response_text = llm_response_cache[cache_key]
-            print(f"[LLM CACHE] Serving cached LLM response for: '{req.headline}'")
-        else:
-            try:
-                if req.provider == "gemini":
-                    response_text = await call_gemini(api_key, used_model, system_instruction_to_use, prompt)
-                elif req.provider == "openai":
-                    response_text = await call_openai(api_key, used_model, system_instruction_to_use, prompt)
-                elif req.provider == "anthropic":
-                    response_text = await call_anthropic(api_key, used_model, system_instruction_to_use, prompt)
-                elif req.provider == "custom":
-                    response_text = await call_custom(api_key, req.customUrl, used_model, system_instruction_to_use, prompt)
-                elif req.provider == "semburat":
-                    response_text = await call_semburat_gateway(req.customUrl, used_model, system_instruction_to_use, prompt)
-                else:
-                    raise ValueError(f"Unknown provider: {req.provider}")
-            except Exception as call_err:
-                print(f"[AI Analysis Error] Provider {req.provider} call failed: {call_err}. Falling back to simulation.")
-                # Construct high-fidelity simulated response matching the schema
-                import random
-                # Check for crisis keywords or geopolitics in headline
-                headline_lower = req.headline.lower()
-                is_geopolitical = any(x in headline_lower for x in ["war", "strike", "attack", "kill", "protest", "military", "border", "missile", "died", "bridge", "disaster", "hunger"])
-                is_macro = any(x in headline_lower for x in ["cpi", "nfp", "fed", "rate", "inflation", "gdp", "job", "interest"])
-                
-                sentiment = "NEUTRAL"
-                if any(x in headline_lower for x in ["kill", "die", "attack", "bomb", "crisis", "disaster"]):
-                    sentiment = "CRITICAL"
-                elif any(x in headline_lower for x in ["protest", "clash", "fell", "drop", "warn", "hunger", "sparks"]):
-                    sentiment = "NEGATIVE"
-                
-                decision = "HOLD"
-                confidence = 25
-                
-                if sentiment == "CRITICAL":
-                    decision = "SHORT"
-                    confidence = random.randint(35, 45)
-                elif sentiment == "NEGATIVE":
-                    decision = "SHORT"
-                    confidence = random.randint(30, 38)
+        # Check cache and serialize LLM calls using lock
+        llm_lock_obj = get_llm_lock()
+        async with llm_lock_obj:
+            if cache_key in llm_response_cache:
+                response_text = llm_response_cache[cache_key]
+                logger.info(f"[LLM CACHE] Serving cached LLM response for: '{req.headline}'")
+            else:
+                try:
+                    if req.provider == "gemini":
+                        response_text = await call_gemini(api_key, used_model, system_instruction_to_use, prompt)
+                    elif req.provider == "openai":
+                        response_text = await call_openai(api_key, used_model, system_instruction_to_use, prompt)
+                    elif req.provider == "anthropic":
+                        response_text = await call_anthropic(api_key, used_model, system_instruction_to_use, prompt)
+                    elif req.provider == "custom":
+                        response_text = await call_custom(api_key, req.customUrl, used_model, system_instruction_to_use, prompt)
+                    elif req.provider == "semburat":
+                        response_text = await call_semburat_gateway(req.customUrl, used_model, system_instruction_to_use, prompt)
+                    else:
+                        raise ValueError(f"Unknown provider: {req.provider}")
+                except Exception as call_err:
+                    logger.error(f"[AI Analysis Error] Provider {req.provider} call failed: {call_err}. Falling back to simulation.")
+                    # Construct high-fidelity simulated response matching the schema
+                    import random
+                    # Check for crisis keywords or geopolitics in headline
+                    headline_lower = req.headline.lower()
+                    is_geopolitical = any(x in headline_lower for x in ["war", "strike", "attack", "kill", "protest", "military", "border", "missile", "died", "bridge", "disaster", "hunger"])
+                    is_macro = any(x in headline_lower for x in ["cpi", "nfp", "fed", "rate", "inflation", "gdp", "job", "interest"])
                     
-                simulated_json = {
-                    "isGeopolitical": is_geopolitical,
-                    "isMacro": is_macro,
-                    "crisisKeywords": [w[:10] for w in headline_lower.split() if len(w) > 4][:3],
-                    "sentiment": sentiment,
-                    "impactScore": 45 if sentiment == "NEGATIVE" else (85 if sentiment == "CRITICAL" else 15),
-                    "macroDetails": {
-                        "eventName": "N/A" if not is_macro else "Macro Indicator",
-                        "actualValue": "N/A",
-                        "forecastValue": "N/A",
-                        "deviation": 0.0,
-                        "usdStrengthened": False
-                    },
-                    "assetsImpact": [
-                        {"symbol": "BTC", "direction": "DOWN" if sentiment in ["CRITICAL", "NEGATIVE"] else "NEUTRAL", "percentage": -0.12 if sentiment in ["CRITICAL", "NEGATIVE"] else 0.0},
-                        {"symbol": "SOL", "direction": "DOWN" if sentiment in ["CRITICAL", "NEGATIVE"] else "NEUTRAL", "percentage": -0.15 if sentiment in ["CRITICAL", "NEGATIVE"] else 0.0},
-                        {"symbol": "XAU", "direction": "UP" if is_geopolitical else "NEUTRAL", "percentage": 0.08 if is_geopolitical else 0.0},
-                        {"symbol": "DXY", "direction": "NEUTRAL", "percentage": 0.0}
-                    ],
-                    "analysisSummary": f"[SIMULATED FALLBACK] Berita '{req.headline}' dianalisis dengan sentimen {sentiment}. Mengingat keterbatasan data/koneksi provider {req.provider}, sistem menggunakan estimasi statistik.",
-                    "tradeDecision": {
-                        "decision": decision,
-                        "targetAsset": target_asset,
-                        "confidence": confidence,
-                        "recommendedLeverage": "5x" if decision != "HOLD" else "N/A",
-                        "recommendedStopLoss": "2.5%" if decision != "HOLD" else "N/A",
-                        "strategyReasoning": f"Reaksi simulasi netral/defensif berdasarkan kategori sentimen {sentiment} dan batasan risiko bot."
+                    sentiment = "NEUTRAL"
+                    if any(x in headline_lower for x in ["kill", "die", "attack", "bomb", "crisis", "disaster"]):
+                        sentiment = "CRITICAL"
+                    elif any(x in headline_lower for x in ["protest", "clash", "fell", "drop", "warn", "hunger", "sparks"]):
+                        sentiment = "NEGATIVE"
+                    
+                    decision = "HOLD"
+                    confidence = 25
+                    
+                    if sentiment == "CRITICAL":
+                        decision = "SHORT"
+                        confidence = random.randint(35, 45)
+                    elif sentiment == "NEGATIVE":
+                        decision = "SHORT"
+                        confidence = random.randint(30, 38)
+                        
+                    simulated_json = {
+                        "isGeopolitical": is_geopolitical,
+                        "isMacro": is_macro,
+                        "crisisKeywords": [w[:10] for w in headline_lower.split() if len(w) > 4][:3],
+                        "sentiment": sentiment,
+                        "impactScore": 45 if sentiment == "NEGATIVE" else (85 if sentiment == "CRITICAL" else 15),
+                        "macroDetails": {
+                            "eventName": "N/A" if not is_macro else "Macro Indicator",
+                            "actualValue": "N/A",
+                            "forecastValue": "N/A",
+                            "deviation": 0.0,
+                            "usdStrengthened": False
+                        },
+                        "assetsImpact": [
+                            {"symbol": "BTC", "direction": "DOWN" if sentiment in ["CRITICAL", "NEGATIVE"] else "NEUTRAL", "percentage": -0.12 if sentiment in ["CRITICAL", "NEGATIVE"] else 0.0},
+                            {"symbol": "SOL", "direction": "DOWN" if sentiment in ["CRITICAL", "NEGATIVE"] else "NEUTRAL", "percentage": -0.15 if sentiment in ["CRITICAL", "NEGATIVE"] else 0.0},
+                            {"symbol": "XAU", "direction": "UP" if is_geopolitical else "NEUTRAL", "percentage": 0.08 if is_geopolitical else 0.0},
+                            {"symbol": "DXY", "direction": "NEUTRAL", "percentage": 0.0}
+                        ],
+                        "analysisSummary": f"[SIMULATED FALLBACK] Berita '{req.headline}' dianalisis dengan sentimen {sentiment}. Mengingat keterbatasan data/koneksi provider {req.provider}, sistem menggunakan estimasi statistik.",
+                        "tradeDecision": {
+                            "decision": decision,
+                            "targetAsset": target_asset,
+                            "confidence": confidence,
+                            "recommendedLeverage": "5x" if decision != "HOLD" else "N/A",
+                            "recommendedStopLoss": "2.5%" if decision != "HOLD" else "N/A",
+                            "strategyReasoning": f"Reaksi simulasi netral/defensif berdasarkan kategori sentimen {sentiment} dan batasan risiko bot."
+                        }
                     }
-                }
-                import json
-                response_text = json.dumps(simulated_json)
-            
-            # Save to cache with eviction policy
-            if len(llm_response_cache) >= 100:
-                oldest_key = next(iter(llm_response_cache))
-                llm_response_cache.pop(oldest_key, None)
-            llm_response_cache[cache_key] = response_text
+                    import json
+                    response_text = json.dumps(simulated_json)
+                
+                # Save to cache with eviction policy
+                if len(llm_response_cache) >= 100:
+                    oldest_key = next(iter(llm_response_cache))
+                    llm_response_cache.pop(oldest_key, None)
+                llm_response_cache[cache_key] = response_text
 
         parsed_analysis = clean_and_parse_json(response_text)
 
@@ -1644,11 +1479,11 @@ Gunakan data real-time, volatilitas pasar, sentimen berita, indeks Fear & Greed,
             bypass_veto = strategy_name in ["AGGRESSIVE", "SCALPING", "HEDGING"]
 
             if target_asset not in crypto_assets:
-                print(f"[Veto Gate] Asset {target_asset} not supported by ML pipeline")
+                logger.info(f"[Veto Gate] Asset {target_asset} not supported by ML pipeline")
                 veto_active = True
                 veto_reason = f"Asset {target_asset} not supported by ML pipeline — forcing HOLD for safety"
                 if not bypass_veto:
-                    print(f"[Veto Gate] Forcing HOLD for safety")
+                    logger.info(f"[Veto Gate] Forcing HOLD for safety")
                     ai_decision["decision"] = "HOLD"
                     parsed_analysis["tradeDecision"] = ai_decision
             else:
@@ -1657,7 +1492,7 @@ Gunakan data real-time, volatilitas pasar, sentimen berita, indeks Fear & Greed,
                     from backend.database import load_ai_config
                     
                     # Fetch recent candles from public API (need at least 100 for indicators)
-                    df_recent = fetch_recent_candles(target_asset, count=120, interval="5m")
+                    df_recent = await fetch_recent_candles(target_asset, count=120, interval="5m")
                     
                     # Predict direction using current configured ML model
                     config = await load_ai_config()
@@ -1668,19 +1503,19 @@ Gunakan data real-time, volatilitas pasar, sentimen berita, indeks Fear & Greed,
                         df_recent, model_type=model_type, resample_minutes=resample_min
                     )
                 
-                    print(f"[Veto Gate] LLM proposed {llm_decision} on {target_asset}.")
-                    print(f"[Veto Gate] ML predict: {ml_prediction} (confidence: {ml_confidence:.4f}), is_ood: {is_ood}")
-                    print(f"[Veto Gate] Meta-model: P(win)={meta_p_win if meta_p_win is not None else 0.0:.4f}, Approved={meta_approved}, Evaluated={meta_evaluated}")
+                    logger.info(f"[Veto Gate] LLM proposed {llm_decision} on {target_asset}.")
+                    logger.info(f"[Veto Gate] ML predict: {ml_prediction} (confidence: {ml_confidence:.4f}), is_ood: {is_ood}")
+                    logger.info(f"[Veto Gate] Meta-model: P(win)={meta_p_win if meta_p_win is not None else 0.0:.4f}, Approved={meta_approved}, Evaluated={meta_evaluated}")
                     
                     # Oppose threshold (3 classes multiclass: threshold 0.35)
                     veto_thresh = 0.35
                     
                     if is_ood:
-                        print(f"[Veto Gate] OOD Guard active. Market anomaly detected.")
+                        logger.info(f"[Veto Gate] OOD Guard active. Market anomaly detected.")
                         veto_active = True
                         veto_reason = f"OOD Guard Active ({len(ood_violations)} violations) - conservative HOLD triggered."
                         if not bypass_veto:
-                            print(f"[Veto Gate] Overriding LLM decision to HOLD out of caution.")
+                            logger.info(f"[Veto Gate] Overriding LLM decision to HOLD out of caution.")
                             ai_decision["decision"] = "HOLD"
                             parsed_analysis["tradeDecision"] = ai_decision
                     else:
@@ -1694,22 +1529,22 @@ Gunakan data real-time, volatilitas pasar, sentimen berita, indeks Fear & Greed,
                             veto_active = True
                             veto_reason = "ML Neutral - No Directional Confirmation"
                         if veto_active and not is_ood:
-                            print(f"[Veto Gate] VETO TRIGGERED! Reason: {veto_reason}.")
+                            logger.info(f"[Veto Gate] VETO TRIGGERED! Reason: {veto_reason}.")
                             if not bypass_veto:
-                                print(f"[Veto Gate] Overriding LLM decision {llm_decision} to HOLD.")
+                                logger.info(f"[Veto Gate] Overriding LLM decision {llm_decision} to HOLD.")
                                 ai_decision["decision"] = "HOLD"
                                 parsed_analysis["tradeDecision"] = ai_decision
                             else:
-                                print(f"[Veto Gate] Strategy is {strategy_name} — bypassing veto override.")
+                                logger.info(f"[Veto Gate] Strategy is {strategy_name} — bypassing veto override.")
                 except Exception as ml_err:
-                    print(f"[Veto Gate] Error running ML confirmation/veto gate: {ml_err}.")
+                    logger.error(f"[Veto Gate] Error running ML confirmation/veto gate: {ml_err}.")
                     veto_active = True
                     veto_reason = f"ML gate error: {str(ml_err)}"
                     meta_p_win = None
                     meta_approved = False
                     meta_evaluated = False
                     if not bypass_veto:
-                        print(f"[Veto Gate] Forcing HOLD for safety.")
+                        logger.info(f"[Veto Gate] Forcing HOLD for safety.")
                         ai_decision["decision"] = "HOLD"
                         parsed_analysis["tradeDecision"] = ai_decision
                 
@@ -1760,7 +1595,7 @@ Gunakan data real-time, volatilitas pasar, sentimen berita, indeks Fear & Greed,
 
         # Save to database
         try:
-            db = read_database()
+            db = await read_database_async()
             if "savedAnalyses" not in db:
                 db["savedAnalyses"] = []
             db["savedAnalyses"].insert(0, {
@@ -1777,9 +1612,9 @@ Gunakan data real-time, volatilitas pasar, sentimen berita, indeks Fear & Greed,
                 }
             })
             db["savedAnalyses"] = db["savedAnalyses"][:50]
-            write_database(db)
+            await write_database_async(db)
         except Exception as db_err:
-            print(f"[DATABASE] Failed to save analysis: {db_err}")
+            logger.error(f"[DATABASE] Failed to save analysis: {db_err}")
 
         return {
             "fallback": False,
@@ -1789,7 +1624,7 @@ Gunakan data real-time, volatilitas pasar, sentimen berita, indeks Fear & Greed,
             "event": generated_event
         }
     except Exception as e:
-        print(f"Error in AI analysis: {e}")
+        logger.error(f"Error in AI analysis: {e}")
         raise HTTPException(status_code=500, detail=f"Failed to analyze with {req.provider}: {str(e)}")
 
 @app.post("/api/gemini/analyze")
@@ -1925,7 +1760,7 @@ async def get_backtest_candles(symbol: str = "BTCUSDT", startTime: int = 0, impa
                         } for c in data]
                     }
     except Exception as e:
-        print(f"Binance Live API bypass active. Using deterministic simulator: {e}")
+        logger.info(f"Binance Live API bypass active. Using deterministic simulator: {e}")
 
     # Deterministic Quant Simulator Fallback
     seed = startTime % 10000
@@ -2073,9 +1908,9 @@ async def run_dry_run_pipeline_endpoint(req: RunDryRunRequest):
     target_symbol = req.symbol.upper()
     
     try:
-        df_hist = fetch_historical_candles_from_binance(target_symbol, req.timestamp, count=120, interval="5m")
+        df_hist = await fetch_historical_candles_from_binance(target_symbol, req.timestamp, count=120, interval="5m")
     except Exception as e:
-        print(f"[Dry Run] Failed to fetch historical candles: {e}. Generating mock candles.")
+        logger.error(f"[Dry Run] Failed to fetch historical candles: {e}. Generating mock candles.")
         # Fallback mock candles
         times = [req.timestamp - i * 5 * 60 * 1000 for i in range(120)]
         times.reverse()
@@ -2159,7 +1994,7 @@ async def run_dry_run_pipeline_endpoint(req: RunDryRunRequest):
         limit_top_n=10
     )
     
-    print(f"[Dry Run Enrichment] Compiled {len(all_headlines)} headlines. Top-N enriched: {len(top_enriched)} | Support: {len(support_headlines)}")
+    logger.info(f"[Dry Run Enrichment] Compiled {len(all_headlines)} headlines. Top-N enriched: {len(top_enriched)} | Support: {len(support_headlines)}")
     
     # Format main enriched context
     utama_context_list = []
@@ -2267,7 +2102,7 @@ Anda harus mengembalikan response dalam format JSON yang valid dan bersih dengan
                         f"    Respon Lilin BTCUSDT: 15m={pct_15m} | 1h={pct_1h} | 4h={pct_4h}"
                     )
         except Exception as db_err:
-            print(f"[RAG Dryrun] Failed to fetch analogies: {db_err}")
+            logger.error(f"[RAG Dryrun] Failed to fetch analogies: {db_err}")
 
     analogies_context = "\n".join(analogies_context_list) if analogies_context_list else "Tidak ditemukan kejadian serupa ber-analog respon pasar di database historis."
 
@@ -2371,7 +2206,7 @@ Kembalikan response dalam format JSON yang valid dan bersih dengan struktur pers
 }}"""
             raw_response = await call_custom(api_key, custom_base_url, used_model, custom_system_instruction, prompt)
     except Exception as e:
-        print(f"[Dry Run] LLM call error: {e}")
+        logger.error(f"[Dry Run] LLM call error: {e}")
         raw_response = f"LLM error: {str(e)}"
 
     # 2. Parse response with dynamic error handling and robust extraction (Fix 2)
@@ -2465,7 +2300,7 @@ Kembalikan response dalam format JSON yang valid dan bersih dengan struktur pers
     asset_mismatch_corrected = False
     
     if llm_suggested_asset != req_base_asset:
-        print(f"[Parser Warning] Asset Mismatch! LLM proposed targetAsset='{llm_suggested_asset}' for symbol='{target_symbol}'. Forcing to '{req_base_asset}'.")
+        logger.warning(f"[Parser Warning] Asset Mismatch! LLM proposed targetAsset='{llm_suggested_asset}' for symbol='{target_symbol}'. Forcing to '{req_base_asset}'.")
         trade_decision["targetAsset"] = req_base_asset
         asset_mismatch_corrected = True
     
@@ -2487,7 +2322,7 @@ Kembalikan response dalam format JSON yang valid dan bersih dengan struktur pers
     meta_evaluated = False
     
     if llm_decision in ["LONG", "SHORT"] and target_asset not in crypto_assets:
-        print(f"[Veto Gate Dry Run] Asset {target_asset} not supported by ML pipeline — forcing HOLD for safety")
+        logger.info(f"[Veto Gate Dry Run] Asset {target_asset} not supported by ML pipeline — forcing HOLD for safety")
         veto_active = True
         veto_reason = f"Asset {target_asset} not supported by ML pipeline — forcing HOLD for safety"
     else:
@@ -2515,7 +2350,7 @@ Kembalikan response dalam format JSON yang valid dan bersih dengan struktur pers
                         veto_active = True
                         veto_reason = "ML Neutral - No Directional Confirmation"
         except Exception as ml_err:
-            print(f"[Dry Run] Veto gate calculation error: {ml_err}. Forcing HOLD for safety.")
+            logger.error(f"[Dry Run] Veto gate calculation error: {ml_err}. Forcing HOLD for safety.")
             veto_active = True
             veto_reason = f"ML error: {str(ml_err)}"
             
@@ -2547,7 +2382,7 @@ Kembalikan response dalam format JSON yang valid dan bersih dengan struktur pers
     try:
         # Fetch candles (Binance API or offline)
         from backend.services.ml.inference import fetch_historical_candles_from_binance
-        df_future = fetch_historical_candles_from_binance(req.symbol, int(req.timestamp + 180 * 60000), count=60, interval="5m")
+        df_future = await fetch_historical_candles_from_binance(req.symbol, int(req.timestamp + 180 * 60000), count=60, interval="5m")
         if not df_future.empty:
             df_future['date_ms'] = pd.to_datetime(df_future['date']).astype(int) // 1000000
             df_after = df_future[df_future['date_ms'] >= req.timestamp].sort_values('date_ms')
@@ -2608,7 +2443,7 @@ Kembalikan response dalam format JSON yang valid dan bersih dengan struktur pers
             sim_outcome = "SIMULATED WIN (Binance API Bypass)"
             pct_change = 1.5
     except Exception as sim_err:
-        print(f"[Dry Run] Simulation error: {sim_err}")
+        logger.error(f"[Dry Run] Simulation error: {sim_err}")
         sim_outcome = "SIMULATED WIN (Deterministic)"
         pct_change = 1.5
             

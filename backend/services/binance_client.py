@@ -6,6 +6,7 @@ import httpx
 import asyncio
 from typing import Dict, Any, Optional
 from backend.database import load_ai_config, lock_bot
+from backend.config import VERIFY_SSL
 
 # Global lock to prevent race conditions in circuit breaker checks
 db_lock = asyncio.Lock()
@@ -108,7 +109,7 @@ async def execute_futures_order(
     # 1.5 Fetch current ticker price to estimate safety caps
     ticker_price = 0.0
     try:
-        async with httpx.AsyncClient(verify=False) as client:
+        async with httpx.AsyncClient(verify=VERIFY_SSL) as client:
             ticker_url = f"{FUTURES_BASE_URL}/fapi/v1/ticker/price"
             ticker_query = f"symbol={symbol_usdt}"
             ticker_res = await client.get(f"{ticker_url}?{ticker_query}", timeout=5.0)
@@ -134,7 +135,7 @@ async def execute_futures_order(
                 "message": "Binance API Key or Secret is missing. Please configure it in Settings."
             }
         try:
-            async with httpx.AsyncClient(verify=False) as client:
+            async with httpx.AsyncClient(verify=VERIFY_SSL) as client:
                 headers = await get_binance_headers(api_key)
                 account_url = f"{FUTURES_BASE_URL}/fapi/v2/account"
                 timestamp = int(time.time() * 1000)
@@ -211,7 +212,7 @@ async def execute_futures_order(
     results = {"order": None, "stop_loss": None, "take_profit": None}
 
     try:
-        async with httpx.AsyncClient(verify=False) as client:
+        async with httpx.AsyncClient(verify=VERIFY_SSL) as client:
             # 1. Set Leverage
             leverage_url = f"{FUTURES_BASE_URL}/fapi/v1/leverage"
             timestamp = int(time.time() * 1000)

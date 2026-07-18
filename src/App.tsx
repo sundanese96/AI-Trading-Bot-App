@@ -27,13 +27,15 @@ import { CandleChart } from "./components/CandleChart";
 import { NewsPanel } from "./components/NewsPanel";
 import { BacktestPanel } from "./components/BacktestPanel";
 import { MLPanel } from "./components/MLPanel";
-import { SettingsPanel } from "./components/SettingsPanel";
-import { AIBotPanel } from "./components/AIBotPanel";
+import { SettingsPanel } from "./components/Settings/SettingsPanel";
+import { AIBotPanel } from "./components/AIBot/AIBotPanel";
 import { DocsPanel } from "./components/DocsPanel";
 import { ErrorBoundary } from "./components/ErrorBoundary";
 import { CorrelationMatrix } from "./components/CorrelationMatrix";
 import { CryptoTicker } from "./components/CryptoTicker";
-
+import { Navbar } from "./components/Layout/Navbar";
+import { PortfolioWidget } from "./components/Trading/PortfolioWidget";
+import { OrderTicket } from "./components/Trading/OrderTicket";
 
 import { LiveTradingPanel } from "./components/live_trading/LiveTradingPanel";
 import { LoginScreen } from "./components/LoginScreen";
@@ -91,17 +93,6 @@ export default function App() {
   });
   const [notifLogs, setNotifLogs] = useState<NotificationLog[]>([]);
 
-  // Order Ticket Widget State
-  const [orderType, setOrderType] = useState<"BUY" | "SELL">("BUY");
-  const [orderSizeUSD, setOrderSizeUSD] = useState(1000);
-  const [orderLeverage, setOrderLeverage] = useState(10);
-  const [stopLoss, setStopLoss] = useState("");
-  const [takeProfit, setTakeProfit] = useState("");
-  const [trailingStopPct, setTrailingStopPct] = useState("");
-
-  const [isSubmittingOrder, setIsSubmittingOrder] = useState(false);
-  const [orderFeedback, setOrderFeedback] = useState({ text: "", isError: false });
-
   const [isLoadingNews, setIsLoadingNews] = useState(false);
   const [confirmReset, setConfirmReset] = useState(false);
   const [confirmLogout, setConfirmLogout] = useState(false);
@@ -154,7 +145,13 @@ export default function App() {
       const tRes = await fetch("/api/trades");
       if (tRes.ok) {
         const tData = await tRes.json();
-        setTrades(tData.trades);
+        // Backend might return an array directly or an object with 'trades' key
+        let safeTrades = Array.isArray(tData) ? tData : (tData.trades || []);
+        safeTrades = safeTrades.map((t: any) => ({
+          ...t,
+          symbol: t.symbol || t.targetAsset || "UNKNOWN"
+        }));
+        setTrades(safeTrades);
       }
 
       const nRes = await fetch("/api/notifications/settings");
@@ -250,44 +247,6 @@ export default function App() {
     };
     fetchNews();
   }, [isAuthenticated]);
-
-  // Handler: Execute new simulated trading position
-  const handleExecuteOrder = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setIsSubmittingOrder(true);
-    setOrderFeedback({ text: "", isError: false });
-
-    try {
-      const response = await fetch("/api/trade/execute", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          symbol: selectedCoin,
-          type: orderType,
-          sizeUSD: orderSizeUSD,
-          leverage: orderLeverage,
-          sl: stopLoss || null,
-          tp: takeProfit || null,
-          trailingStopPct: trailingStopPct || null,
-        }),
-      });
-
-      const resData = await response.json();
-      if (response.ok) {
-        setOrderFeedback({ text: "Order berhasil dieksekusi secara instan!", isError: false });
-        setStopLoss("");
-        setTakeProfit("");
-        setTrailingStopPct("");
-        fetchBackendState();
-      } else {
-        setOrderFeedback({ text: resData.message || "Gagal mengeksekusi transaksi.", isError: true });
-      }
-    } catch (err: any) {
-      setOrderFeedback({ text: err.message || "Gagal menghubungkan ke server.", isError: true });
-    } finally {
-      setIsSubmittingOrder(false);
-    }
-  };
 
   const handleClosePosition = async (tradeId: string) => {
     try {
@@ -470,26 +429,35 @@ export default function App() {
   const liveCoinPrice = livePrices[selectedCoin] || 0;
 
   const { openPositions, completedTrades } = React.useMemo(() => {
+    const safeTrades = Array.isArray(trades) ? trades : [];
     return {
-      openPositions: trades.filter((t) => t.status === "OPEN"),
-      completedTrades: trades.filter((t) => t.status === "CLOSED"),
+      openPositions: safeTrades.filter((t) => t.status === "OPEN"),
+      completedTrades: safeTrades.filter((t) => t.status === "CLOSED"),
     };
   }, [trades]);
 
   // Calculate Unrealized PnL (fluctuating based on live tickers!)
   const totalUnrealizedPnlUSD = React.useMemo(() => {
     return openPositions.reduce((sum, pos) => {
-      const currentPrice = livePrices[pos.symbol] || pos.entryPrice;
-      const priceDiff = pos.type === "BUY" ? currentPrice - pos.entryPrice : pos.entryPrice - currentPrice;
-      const rawReturn = priceDiff / pos.entryPrice;
-      const fee = pos.size * pos.entryPrice * 0.001;
-      const pnl = rawReturn * (pos.size * pos.entryPrice) - fee; // no double-leverage
-      return sum + pnl;
+      const entryPrice = Number(pos.entryPrice) || 0;
+      const size = Number(pos.size) || 0;
+      if (entryPrice === 0 || size === 0) return sum; // prevent NaN/Infinity
+      
+      const symbol = pos.symbol || pos.targetAsset || "UNKNOWN";
+      const currentPrice = Number(livePrices[symbol]) || entryPrice;
+      
+      const priceDiff = pos.type === "BUY" ? currentPrice - entryPrice : entryPrice - currentPrice;
+      const rawReturn = priceDiff / entryPrice;
+      const fee = size * entryPrice * 0.001;
+      const pnl = rawReturn * (size * entryPrice) - fee; // no double-leverage
+      
+      return sum + (isNaN(pnl) ? 0 : pnl);
     }, 0);
   }, [openPositions, livePrices]);
 
-  const accountNetWorthUSD = portfolio.balanceUSD + totalUnrealizedPnlUSD;
-  const netWorthReturnPct = ((accountNetWorthUSD - portfolio.initialBalance) / portfolio.initialBalance) * 100;
+  const accountNetWorthUSD = (Number(portfolio.balanceUSD) || 0) + totalUnrealizedPnlUSD;
+  const initialBalance = Number(portfolio.initialBalance) || 1; // prevent division by zero
+  const netWorthReturnPct = ((accountNetWorthUSD - initialBalance) / initialBalance) * 100;
 
   if (isAuthenticated === null) {
     return (
@@ -511,141 +479,12 @@ export default function App() {
     <div className="min-h-screen bg-slate-950 text-slate-100 flex flex-col selection:bg-indigo-500/35 selection:text-white">
       {/* Sticky Header Wrapper */}
       <header className="sticky top-0 z-40 flex flex-col">
-        {/* 1. TOP PREMIUM NAV RAIL / BAR */}
-        <nav className="border-b border-slate-900 bg-slate-900/45 backdrop-blur-xl px-6 py-4 flex flex-wrap justify-between items-center gap-4">
-          <div className="flex items-center gap-3">
-            <div className="h-10 w-10 bg-gradient-to-tr from-indigo-600 to-purple-600 rounded-2xl flex items-center justify-center font-sans font-extrabold text-white text-xl tracking-tighter shadow-lg shadow-indigo-600/25">
-              KS
-            </div>
-            <div>
-              <h1 className="font-sans font-extrabold text-lg text-white tracking-tight flex items-center gap-1.5">
-                KriptoSakti <span className="text-[10px] bg-indigo-500/10 text-indigo-400 font-mono font-bold px-2 py-0.5 rounded border border-indigo-500/20">V3.5</span>
-              </h1>
-              <p className="text-[10px] text-slate-500 font-mono">Platform Trading Simulasi, Sentimen Gemini & ML Backtest</p>
-            </div>
-          </div>
-
-          {/* Tab Selection */}
-          <div className="flex bg-slate-950 p-1 rounded-xl border border-slate-850">
-            <button
-              onClick={() => setActiveTab("TRADING")}
-              className={`flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg text-xs font-bold transition font-sans cursor-pointer ${
-                activeTab === "TRADING" ? "bg-slate-900 text-indigo-400 border border-slate-850" : "text-slate-500 hover:text-slate-300"
-              }`}
-            >
-              <TrendingUp className="h-3.5 w-3.5" /> Desk Trading
-            </button>
-            <button
-              onClick={() => setActiveTab("NEWS")}
-              className={`flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg text-xs font-bold transition font-sans cursor-pointer ${
-                activeTab === "NEWS" ? "bg-slate-900 text-indigo-400 border border-slate-850" : "text-slate-500 hover:text-slate-300"
-              }`}
-            >
-              <Newspaper className="h-3.5 w-3.5" /> Sentimen Berita
-            </button>
-            <button
-              onClick={() => setActiveTab("BACKTEST")}
-              className={`flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg text-xs font-bold transition font-sans cursor-pointer ${
-                activeTab === "BACKTEST" ? "bg-slate-900 text-indigo-400 border border-slate-850" : "text-slate-500 hover:text-slate-300"
-              }`}
-            >
-              <Scale className="h-3.5 w-3.5" /> Backtester
-            </button>
-            <button
-              onClick={() => setActiveTab("ML")}
-              className={`flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg text-xs font-bold transition font-sans cursor-pointer ${
-                activeTab === "ML" ? "bg-slate-900 text-indigo-400 border border-slate-850" : "text-slate-500 hover:text-slate-300"
-              }`}
-            >
-              <Cpu className="h-3.5 w-3.5" /> AI & ML Local
-            </button>
-            <button
-              onClick={() => setActiveTab("AI_BOT")}
-              className={`flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg text-xs font-bold transition font-sans cursor-pointer ${
-                activeTab === "AI_BOT" ? "bg-slate-900 text-indigo-400 border border-slate-850" : "text-slate-500 hover:text-slate-300"
-              }`}
-            >
-              <Bot className="h-3.5 w-3.5" /> AI Bot Auto-Trade
-            </button>
-            <button
-              onClick={() => setActiveTab("SETTINGS")}
-              className={`flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg text-xs font-bold transition font-sans cursor-pointer ${
-                activeTab === "SETTINGS" ? "bg-slate-900 text-indigo-400 border border-slate-850" : "text-slate-500 hover:text-slate-300"
-              }`}
-            >
-              <Sliders className="h-3.5 w-3.5" /> Pengaturan AI & Notif
-            </button>
-            <button
-              onClick={() => setActiveTab("LIVE")}
-              className={`flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg text-xs font-bold transition font-sans cursor-pointer ${
-                activeTab === "LIVE" ? "bg-slate-900 text-amber-500 border border-slate-850/80 shadow-md shadow-amber-500/5" : "text-slate-500 hover:text-slate-300"
-              }`}
-            >
-              <Activity className="h-3.5 w-3.5 text-amber-500" /> LIVE TRADING
-            </button>
-            <button
-              onClick={() => setActiveTab("DOCS")}
-              className={`flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg text-xs font-bold transition font-sans cursor-pointer ${
-                activeTab === "DOCS" ? "bg-slate-900 text-indigo-400 border border-slate-850" : "text-slate-500 hover:text-slate-300"
-              }`}
-            >
-              <HelpCircle className="h-3.5 w-3.5" /> Docs / About
-            </button>
-          </div>
-
-          {/* Reset / Controls */}
-          <div className="flex gap-2">
-            {confirmReset ? (
-              <div className="flex items-center gap-1">
-                <button
-                  onClick={handleResetPortfolio}
-                  className="text-[10px] font-mono bg-red-600 hover:bg-red-700 text-white font-bold px-3 py-1.5 rounded-lg transition active:scale-95 cursor-pointer animate-pulse"
-                >
-                  Yakin Reset?
-                </button>
-                <button
-                  onClick={() => setConfirmReset(false)}
-                  className="text-[10px] font-mono bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white px-2 py-1.5 rounded-lg transition cursor-pointer"
-                >
-                  Batal
-                </button>
-              </div>
-            ) : (
-              <button
-                onClick={() => setConfirmReset(true)}
-                className="text-[10px] font-mono bg-red-950/20 border border-red-900/30 hover:border-red-500 hover:text-white text-red-400 px-3 py-1.5 rounded-lg transition active:scale-95 cursor-pointer"
-              >
-                Reset Demo Wallet
-              </button>
-            )}
-
-            {confirmLogout ? (
-              <div className="flex items-center gap-1">
-                <button
-                  onClick={handleLogout}
-                  className="flex items-center gap-1.5 text-[10px] font-mono bg-rose-600 hover:bg-rose-700 text-white font-bold px-3 py-1.5 rounded-lg transition active:scale-95 cursor-pointer"
-                >
-                  Yakin Keluar?
-                </button>
-                <button
-                  onClick={() => setConfirmLogout(false)}
-                  className="text-[10px] font-mono bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white px-2 py-1.5 rounded-lg transition cursor-pointer"
-                >
-                  Batal
-                </button>
-              </div>
-            ) : (
-              <button
-                onClick={() => setConfirmLogout(true)}
-                className="flex items-center gap-1.5 text-[10px] font-mono bg-slate-900/60 border border-slate-800 hover:border-slate-650 hover:border-slate-500 hover:text-white text-slate-400 px-3 py-1.5 rounded-lg transition active:scale-95 cursor-pointer"
-              >
-                <LogOut className="h-3 w-3" /> Keluar
-              </button>
-            )}
-          </div>
-        </nav>
-
-        {/* 1.5. LIVE CRYPTO TICKER (MODULAR) */}
+        <Navbar 
+          activeTab={activeTab} 
+          setActiveTab={setActiveTab as any} 
+          onResetPortfolio={handleResetPortfolio} 
+          onLogout={handleLogout} 
+        />
         <CryptoTicker
           selectedCoin={selectedCoin}
           onSelectCoin={(coin) => {
@@ -656,59 +495,12 @@ export default function App() {
       </header>
 
       {/* 2. LIVE WALLET METRICS OVERVIEW (HUD) */}
-      <div className="bg-slate-900/20 border-b border-slate-900/60 px-6 py-5 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        {/* Metric block 1 */}
-        <div className="flex items-center gap-4 bg-slate-950/35 border border-slate-900/50 p-4 rounded-2xl">
-          <div className="p-3 bg-indigo-500/10 rounded-xl text-indigo-400 border border-indigo-500/20">
-            <DollarSign className="h-5 w-5" />
-          </div>
-          <div>
-            <p className="text-[10px] font-mono text-slate-500 uppercase">Total Net Worth (USD)</p>
-            <p className="text-xl font-mono font-bold text-white mt-0.5">
-              ${accountNetWorthUSD.toLocaleString("en-US", { minimumFractionDigits: 2 })}
-            </p>
-          </div>
-        </div>
-
-        {/* Metric block 2 */}
-        <div className="flex items-center gap-4 bg-slate-950/35 border border-slate-900/50 p-4 rounded-2xl">
-          <div className="p-3 bg-emerald-500/10 rounded-xl text-emerald-400 border border-emerald-500/20">
-            <Coins className="h-5 w-5" />
-          </div>
-          <div>
-            <p className="text-[10px] font-mono text-slate-500 uppercase">Saldo Bebas (Margin)</p>
-            <p className="text-xl font-mono font-bold text-slate-200 mt-0.5">
-              ${portfolio.balanceUSD.toLocaleString("en-US", { minimumFractionDigits: 2 })}
-            </p>
-          </div>
-        </div>
-
-        {/* Metric block 3 */}
-        <div className="flex items-center gap-4 bg-slate-950/35 border border-slate-900/50 p-4 rounded-2xl">
-          <div className={`p-3 rounded-xl border ${totalUnrealizedPnlUSD >= 0 ? "bg-emerald-500/10 text-emerald-400 border-emerald-500/20" : "bg-red-500/10 text-red-400 border-red-500/20"}`}>
-            <Percent className="h-5 w-5" />
-          </div>
-          <div>
-            <p className="text-[10px] font-mono text-slate-500 uppercase">Floating Unrealized P&L</p>
-            <p className={`text-xl font-mono font-bold mt-0.5 ${totalUnrealizedPnlUSD >= 0 ? "text-emerald-400" : "text-red-400"}`}>
-              {totalUnrealizedPnlUSD >= 0 ? "+" : ""}${totalUnrealizedPnlUSD.toLocaleString("en-US", { minimumFractionDigits: 2 })}
-            </p>
-          </div>
-        </div>
-
-        {/* Metric block 4 */}
-        <div className="flex items-center gap-4 bg-slate-950/35 border border-slate-900/50 p-4 rounded-2xl">
-          <div className={`p-3 rounded-xl border ${netWorthReturnPct >= 0 ? "bg-emerald-500/10 text-emerald-400 border-emerald-500/20" : "bg-red-500/10 text-red-400 border-red-500/20"}`}>
-            {netWorthReturnPct >= 0 ? <ArrowUpRight className="h-5 w-5" /> : <ArrowDownRight className="h-5 w-5" />}
-          </div>
-          <div>
-            <p className="text-[10px] font-mono text-slate-500 uppercase">Kinerja Return Akun</p>
-            <p className={`text-xl font-mono font-bold mt-0.5 ${netWorthReturnPct >= 0 ? "text-emerald-400" : "text-red-400"}`}>
-              {netWorthReturnPct >= 0 ? "+" : ""}{netWorthReturnPct.toFixed(2)}%
-            </p>
-          </div>
-        </div>
-      </div>
+      <PortfolioWidget 
+        portfolio={portfolio}
+        accountNetWorthUSD={accountNetWorthUSD}
+        totalUnrealizedPnlUSD={totalUnrealizedPnlUSD}
+        netWorthReturnPct={netWorthReturnPct}
+      />
 
       {/* 3. CORE SUBPANEL VIEWS ROUTING */}
       <main className="flex-1 p-6">
@@ -901,133 +693,12 @@ export default function App() {
 
             {/* Right Column (Leverage Ticket Console) */}
             <div className="xl:col-span-1 space-y-6">
-              {/* Leverage Ticket form widget */}
-              <div className="bg-slate-900/60 backdrop-blur-md border border-slate-800/80 rounded-2xl p-6 shadow-2xl relative overflow-hidden">
-                <div className="flex justify-between items-center mb-5 pb-3 border-b border-slate-850">
-                  <h3 className="font-sans font-extrabold text-base text-white">Tiket Margin Simulasi</h3>
-                  <span className="text-[10px] font-mono text-indigo-400 bg-indigo-500/10 px-2.5 py-1 rounded border border-indigo-500/20">
-                    Sisa Saldo: ${portfolio.balanceUSD.toLocaleString("en-US", { maximumFractionDigits: 1 })}
-                  </span>
-                </div>
-
-                <form onSubmit={handleExecuteOrder} className="space-y-4 text-xs">
-                  {/* Order side selector */}
-                  <div className="grid grid-cols-2 gap-2 p-1 bg-slate-950 rounded-xl border border-slate-850">
-                    <button
-                      type="button"
-                      onClick={() => setOrderType("BUY")}
-                      className={`py-2 rounded-lg text-xs font-bold transition font-sans cursor-pointer ${
-                        orderType === "BUY" ? "bg-emerald-600 text-white shadow" : "text-slate-500 hover:text-slate-300"
-                      }`}
-                    >
-                      LONG (BELI)
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => setOrderType("SELL")}
-                      className={`py-2 rounded-lg text-xs font-bold transition font-sans cursor-pointer ${
-                        orderType === "SELL" ? "bg-red-600 text-white shadow" : "text-slate-500 hover:text-slate-300"
-                      }`}
-                    >
-                      SHORT (JUAL)
-                    </button>
-                  </div>
-
-                  {/* Leverage slider */}
-                  <div className="space-y-1.5">
-                    <div className="flex justify-between text-[10px] font-mono text-slate-400">
-                      <span>LEVERAGE MARGIN</span>
-                      <span className="text-indigo-400 font-bold">{orderLeverage}x</span>
-                    </div>
-                    <input
-                      type="range"
-                      min="1"
-                      max="100"
-                      value={orderLeverage}
-                      onChange={(e) => setOrderLeverage(parseInt(e.target.value))}
-                      className="w-full h-1 bg-slate-850 rounded-lg appearance-none cursor-pointer accent-indigo-500"
-                    />
-                  </div>
-
-                  {/* Margin Collateral Size */}
-                  <div className="space-y-1.5">
-                    <label className="text-slate-400 font-mono">COLLATERAL MARGIN (USD)</label>
-                    <div className="relative">
-                      <span className="absolute left-3.5 top-2.5 text-slate-500 font-mono font-bold">$</span>
-                      <input
-                        type="number"
-                        min="10"
-                        value={orderSizeUSD}
-                        onChange={(e) => setOrderSizeUSD(Math.max(10, parseInt(e.target.value) || 0))}
-                        className="w-full bg-slate-950 border border-slate-850 focus:border-indigo-500 rounded-xl pl-8 pr-3 py-2.5 text-slate-200 outline-none font-mono font-bold"
-                      />
-                    </div>
-                    <p className="text-[9px] text-slate-500 font-mono">
-                      * Total Ukuran Posisi: <span className="text-white">${(orderSizeUSD * orderLeverage).toLocaleString()} USD</span> ({(orderSizeUSD * orderLeverage / liveCoinPrice).toFixed(4)} {selectedCoin.replace("USDT", "")})
-                    </p>
-                  </div>
-
-                  {/* Stop Loss & Take Profit limits setup */}
-                  <div className="grid grid-cols-2 gap-3 border-t border-slate-850/50 pt-3">
-                    <div className="space-y-1.5">
-                      <label className="text-slate-400 font-mono">STOP LOSS (HARGA)</label>
-                      <input
-                        type="number"
-                        placeholder="Contoh: 92000"
-                        value={stopLoss}
-                        onChange={(e) => setStopLoss(e.target.value)}
-                        className="w-full bg-slate-950 border border-slate-850 focus:border-indigo-500 rounded-xl px-3 py-2 text-slate-200 outline-none font-mono"
-                      />
-                    </div>
-                    <div className="space-y-1.5">
-                      <label className="text-slate-400 font-mono">TAKE PROFIT (HARGA)</label>
-                      <input
-                        type="number"
-                        placeholder="Contoh: 98000"
-                        value={takeProfit}
-                        onChange={(e) => setTakeProfit(e.target.value)}
-                        className="w-full bg-slate-950 border border-slate-850 focus:border-indigo-500 rounded-xl px-3 py-2 text-slate-200 outline-none font-mono"
-                      />
-                    </div>
-                  </div>
-
-                  {/* Trailing Stop configuration options */}
-                  <div className="space-y-1.5">
-                    <label className="text-slate-400 font-mono">TRAILING STOP (%)</label>
-                    <input
-                      type="number"
-                      step="0.1"
-                      placeholder="Contoh: 1.5 untuk 1.5%"
-                      value={trailingStopPct}
-                      onChange={(e) => setTrailingStopPct(e.target.value)}
-                      className="w-full bg-slate-950 border border-slate-850 focus:border-indigo-500 rounded-xl px-3 py-2 text-slate-200 outline-none font-mono"
-                    />
-                    <p className="text-[9px] text-slate-500 font-mono leading-relaxed">
-                      * Trailing Stop melacak harga secara otomatis dan melikuidasi posisi jika harga berbalik melawan Anda sebesar persentase ini.
-                    </p>
-                  </div>
-
-                  {/* Action feedback info */}
-                  {orderFeedback.text && (
-                    <div className={`p-3 rounded-xl text-[11px] leading-relaxed border ${orderFeedback.isError ? "bg-red-950/20 border-red-900/30 text-red-400" : "bg-emerald-950/20 border-emerald-900/30 text-emerald-400"}`}>
-                      {orderFeedback.text}
-                    </div>
-                  )}
-
-                  {/* Execute Button */}
-                  <button
-                    type="submit"
-                    disabled={isSubmittingOrder}
-                    className={`w-full font-sans font-bold text-white py-3 px-4 rounded-xl active:scale-[0.98] transition cursor-pointer shadow-lg ${
-                      orderType === "BUY"
-                        ? "bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 shadow-emerald-600/10"
-                        : "bg-gradient-to-r from-red-600 to-rose-600 hover:from-red-500 hover:to-rose-500 shadow-red-600/10"
-                    }`}
-                  >
-                    {isSubmittingOrder ? "Memproses Margin..." : `Buka Posisi ${orderType === "BUY" ? "LONG" : "SHORT"}`}
-                  </button>
-                </form>
-              </div>
+              <OrderTicket 
+                portfolio={portfolio} 
+                selectedCoin={selectedCoin} 
+                liveCoinPrice={livePrices[selectedCoin] || 1} 
+                onOrderSuccess={fetchBackendState} 
+              />
 
               {/* Completed closed trades summary history box */}
               <div className="bg-slate-900/60 border border-slate-800/80 rounded-2xl p-5 shadow-2xl space-y-4">

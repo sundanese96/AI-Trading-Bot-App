@@ -8,8 +8,9 @@ import xgboost as xgb
 from typing import Tuple, Dict, Any, List, Optional
 from backend.services.ml.model import load_model, MODEL_DIR
 from backend.services.ml.features import extract_features
+from backend.config import VERIFY_SSL
 
-def fetch_recent_candles(symbol: str, count: int = 150, interval: str = "5m") -> pd.DataFrame:
+async def fetch_recent_candles(symbol: str, count: int = 150, interval: str = "5m") -> pd.DataFrame:
     """
     Fetches the most recent candles for a given crypto asset from Binance Futures public API.
     Returns a standard DataFrame with columns: open_time, open, high, low, close, volume, date
@@ -22,7 +23,8 @@ def fetch_recent_candles(symbol: str, count: int = 150, interval: str = "5m") ->
     url = f"https://fapi.binance.com/fapi/v1/klines?symbol={target}&interval={interval}&limit={count}"
     
     print(f"[Inference API] Fetching {count} recent candles for {target} at {interval} from Binance Futures...")
-    resp = httpx.get(url, verify=False, timeout=15.0)
+    async with httpx.AsyncClient(verify=VERIFY_SSL) as client:
+        resp = await client.get(url, timeout=15.0)
     if resp.status_code != 200:
         raise Exception(f"Binance Futures API error while loading klines: {resp.text}")
         
@@ -39,7 +41,7 @@ def fetch_recent_candles(symbol: str, count: int = 150, interval: str = "5m") ->
         
     return df
 
-def fetch_historical_candles_from_binance(symbol: str, end_time_ms: int, count: int = 150, interval: str = "5m") -> pd.DataFrame:
+async def fetch_historical_candles_from_binance(symbol: str, end_time_ms: int, count: int = 150, interval: str = "5m") -> pd.DataFrame:
     """
     Fetches historical candles ending exactly at (or before) end_time_ms from Binance Futures public API.
     Used for historical feature extraction during dry run simulations.
@@ -55,7 +57,8 @@ def fetch_historical_candles_from_binance(symbol: str, end_time_ms: int, count: 
     url = f"https://fapi.binance.com/fapi/v1/klines?symbol={target}&interval={interval}&limit={count}&endTime={query_end_time}"
     
     print(f"[Inference API] Fetching {count} historical candles for {target} ending at {end_time_ms} (interval {interval}) from Binance Futures...")
-    resp = httpx.get(url, verify=False, timeout=15.0)
+    async with httpx.AsyncClient(verify=VERIFY_SSL) as client:
+        resp = await client.get(url, timeout=15.0)
     if resp.status_code != 200:
         raise Exception(f"Binance Futures API error while loading historical klines: {resp.text}")
         
@@ -217,4 +220,3 @@ def predict_live_with_gate(
             meta_approved = True
     
     return int(pred_class), confidence, is_ood, ood_violations, meta_p_win, meta_approved, meta_evaluated
-

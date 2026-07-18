@@ -23,6 +23,9 @@ CUSTOM_AI_MODEL = os.getenv("CUSTOM_AI_MODEL", "")
 PORT = int(os.getenv("PORT", 3000))
 HOST = "0.0.0.0"
 
+# Security Settings
+VERIFY_SSL = os.getenv("VERIFY_SSL", "False").lower() == "true"
+
 # Dashboard Authentication Settings
 DASHBOARD_USERNAME = os.getenv("DASHBOARD_USERNAME", "admin")
 DASHBOARD_PASSWORD = os.getenv("DASHBOARD_PASSWORD", "admin123")

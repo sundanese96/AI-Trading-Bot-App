@@ -22,7 +22,15 @@ def get_model_path(model_type: str, resample_minutes: Optional[int] = None) -> P
         return MODEL_DIR / f"xgboost_model{tf_suffix}.json"
 
 def get_device() -> str:
-    """Detects if CUDA GPU is available, otherwise falls back to CPU."""
+    """Detects if CUDA GPU is available safely without hard crashes."""
+    try:
+        import torch
+        if not torch.cuda.is_available():
+            print("[ML Model] PyTorch reports CUDA is not available. Using CPU.")
+            return "cpu"
+    except ImportError:
+        pass
+
     try:
         dtrain = xgb.DMatrix([[1.0]], label=[1])
         params = {'device': 'cuda'}

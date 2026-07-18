@@ -4,6 +4,7 @@ import httpx
 import asyncio
 import pandas as pd
 from pathlib import Path
+from backend.config import VERIFY_SSL
 
 DATA_DIR = Path("Train-data")
 DATA_DIR.mkdir(parents=True, exist_ok=True)
@@ -54,7 +55,7 @@ async def download_klines(symbol: str):
     backoff_delay = 2.0
     total_downloaded = 0
     
-    async with httpx.AsyncClient(headers=HEADERS, verify=False) as client:
+    async with httpx.AsyncClient(headers=HEADERS, verify=VERIFY_SSL) as client:
         while start_time < end_time_limit:
             params = {
                 "symbol": symbol,
@@ -153,7 +154,7 @@ async def download_funding_rates(symbol: str):
     backoff_delay = 2.0
     total_downloaded = 0
     
-    async with httpx.AsyncClient(headers=HEADERS, verify=False) as client:
+    async with httpx.AsyncClient(headers=HEADERS, verify=VERIFY_SSL) as client:
         while start_time < end_time_limit:
             params = {
                 "symbol": symbol,

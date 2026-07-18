@@ -1,6 +1,7 @@
 import asyncio
 import httpx
 import json
+from backend.config import VERIFY_SSL
 
 async def main():
     url = "http://localhost:8080/v1/chat/completions"
@@ -89,7 +90,7 @@ Gunakan data real-time, volatilitas pasar, sentimen berita, indeks Fear & Greed,
 
     print("Sending request to local LLM server...")
     try:
-        async with httpx.AsyncClient(verify=False) as client:
+        async with httpx.AsyncClient(verify=VERIFY_SSL) as client:
             response = await client.post(url, headers=headers, json=payload, timeout=300.0)
             print(f"Status Code: {response.status_code}")
             print("Response Body:")

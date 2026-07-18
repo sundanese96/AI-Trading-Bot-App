@@ -5,13 +5,32 @@ from backend.config import DB_PATH
 
 # Generate or load encryption key
 KEY_PATH = DB_PATH.parent / ".enc_key"
+BACKUP_KEY_PATH = DB_PATH.parent / ".enc_key_backup"
+
 if not os.path.exists(KEY_PATH):
-    key = Fernet.generate_key()
-    with open(KEY_PATH, "wb") as f:
-        f.write(key)
+    # If backup exists, restore it
+    if os.path.exists(BACKUP_KEY_PATH):
+        import shutil
+        shutil.copy(BACKUP_KEY_PATH, KEY_PATH)
+        with open(KEY_PATH, "rb") as f:
+            key = f.read()
+    else:
+        if os.path.exists(DB_PATH):
+            print("[WARNING] Generating NEW encryption key while database already exists. Old encrypted API keys may be lost!")
+            
+        key = Fernet.generate_key()
+        with open(KEY_PATH, "wb") as f:
+            f.write(key)
+        # Create backup
+        with open(BACKUP_KEY_PATH, "wb") as f:
+            f.write(key)
 else:
     with open(KEY_PATH, "rb") as f:
         key = f.read()
+    # Ensure backup exists
+    if not os.path.exists(BACKUP_KEY_PATH):
+        with open(BACKUP_KEY_PATH, "wb") as f:
+            f.write(key)
 
 cipher_suite = Fernet(key)
 
@@ -103,9 +122,15 @@ def write_database(data):
     except Exception as e:
         print(f"[DATABASE] Error writing database.json: {e}")
 
+async def read_database_async():
+    return await asyncio.to_thread(read_database)
+
+async def write_database_async(data):
+    await asyncio.to_thread(write_database, data)
+
 async def save_ai_config(config: dict):
     async with db_lock:
-        db = read_database()
+        db = await read_database_async()
         
         # Encrypt sensitive API keys before saving
         encrypted_config = dict(config)
@@ -119,11 +144,11 @@ async def save_ai_config(config: dict):
             encrypted_config["telegramBotToken"] = encrypt_text(encrypted_config["telegramBotToken"])
             
         db["aiConfig"] = encrypted_config
-        write_database(db)
+        await write_database_async(db)
 
 async def load_ai_config() -> dict:
     async with db_lock:
-        db = read_database()
+        db = await read_database_async()
         config = db.get("aiConfig", {})
         
         # Decrypt API keys after loading
@@ -143,7 +168,7 @@ async def get_daily_stats() -> dict:
     import time
     import datetime
     async with db_lock:
-        db = read_database()
+        db = await read_database_async()
         now_ms = int(time.time() * 1000)
         cutoff_ms = now_ms - 24 * 60 * 60 * 1000
         
@@ -166,30 +191,30 @@ async def get_daily_stats() -> dict:
             "dailyPnl": round(daily_pnl, 2)
         }
         db["dailyStats"] = stats
-        write_database(db)
+        await write_database_async(db)
         return stats
 
 async def lock_bot():
     async with db_lock:
-        db = read_database()
+        db = await read_database_async()
         if "aiConfig" not in db:
             db["aiConfig"] = {}
         db["aiConfig"]["isLocked"] = True
-        write_database(db)
+        await write_database_async(db)
 
 async def unlock_bot():
     async with db_lock:
-        db = read_database()
+        db = await read_database_async()
         if "aiConfig" not in db:
             db["aiConfig"] = {}
         db["aiConfig"]["isLocked"] = False
-        write_database(db)
+        await write_database_async(db)
 
 async def update_daily_stats(pnl: float):
     import time
     import datetime
     async with db_lock:
-        db = read_database()
+        db = await read_database_async()
         now_ms = int(time.time() * 1000)
         cutoff_ms = now_ms - 24 * 60 * 60 * 1000
         
@@ -218,20 +243,20 @@ async def update_daily_stats(pnl: float):
             "dailyPnl": round(daily_pnl, 2)
         }
         db["dailyStats"] = stats
-        write_database(db)
+        await write_database_async(db)
 
 async def is_trade_processed(trade_id: str) -> bool:
     async with db_lock:
-        db = read_database()
+        db = await read_database_async()
         processed_ids = db.get("processedTradeIds", [])
         return str(trade_id) in processed_ids
 
 async def mark_trade_as_processed(trade_id: str):
     async with db_lock:
-        db = read_database()
+        db = await read_database_async()
         if "processedTradeIds" not in db:
             db["processedTradeIds"] = []
         db["processedTradeIds"].append(str(trade_id))
         # Keep list size reasonable (last 1000 trades)
         db["processedTradeIds"] = db["processedTradeIds"][-1000:]
-        write_database(db)
+        await write_database_async(db)

@@ -1,6 +1,7 @@
 import os
 import pandas as pd
 import numpy as np
+from backend.config import VERIFY_SSL
 
 def calculate_rsi(df: pd.DataFrame, period: int = 14) -> pd.Series:
     """Calculates the Relative Strength Index (RSI) for a given DataFrame."""
@@ -175,7 +176,7 @@ def extract_features(df: pd.DataFrame) -> pd.DataFrame:
                 query_end = end_time_ms - 1
                 url = f"https://fapi.binance.com/fapi/v1/klines?symbol={symbol}&interval={tf}&limit={limit}&endTime={query_end}"
                 try:
-                    resp = httpx.get(url, verify=False, timeout=10.0)
+                    resp = httpx.get(url, verify=VERIFY_SSL, timeout=10.0)
                     if resp.status_code == 200:
                         klines = resp.json()
                         close_prices = [float(k[4]) for k in klines]
@@ -188,7 +189,7 @@ def extract_features(df: pd.DataFrame) -> pd.DataFrame:
             def fetch_funding_live(symbol: str, end_time_ms: int, limit: int = 15) -> pd.DataFrame:
                 url = f"https://fapi.binance.com/fapi/v1/fundingRate?symbol={symbol}&limit={limit}&endTime={end_time_ms}"
                 try:
-                    resp = httpx.get(url, verify=False, timeout=10.0)
+                    resp = httpx.get(url, verify=VERIFY_SSL, timeout=10.0)
                     if resp.status_code == 200:
                         rates = resp.json()
                         dates = [pd.to_datetime(r['fundingTime'], unit='ms').tz_localize(None) for r in rates]

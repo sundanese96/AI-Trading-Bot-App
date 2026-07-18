@@ -4,6 +4,7 @@ import httpx
 import pandas as pd
 from pathlib import Path
 from dotenv import load_dotenv
+from backend.config import VERIFY_SSL
 
 # Load environment variables (allows proxy configuration via HTTP_PROXY/HTTPS_PROXY in .env)
 load_dotenv()
@@ -67,7 +68,7 @@ async def download_btc_historical_data():
     
     total_downloaded = 0
     
-    async with httpx.AsyncClient(headers=HEADERS, verify=False) as client:
+    async with httpx.AsyncClient(headers=HEADERS, verify=VERIFY_SSL) as client:
         while start_time < end_time_limit:
             params = {
                 "symbol": "BTCUSDT",

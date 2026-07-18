@@ -24,7 +24,7 @@ def analyze_sentiment(text: str) -> Dict[str, Any]:
     negative = []
     tokens = []
     
-    for w in words:
+    for i, w in enumerate(words):
         # clean word punctuation
         w_clean = re.sub(r'[^\w]', '', w)
         if not w_clean:
@@ -32,6 +32,12 @@ def analyze_sentiment(text: str) -> Dict[str, Any]:
         tokens.append(w_clean)
         if w_clean in AFINN:
             val = AFINN[w_clean]
+            # Check for negation in the previous word
+            if i > 0:
+                prev_word = re.sub(r'[^\w]', '', words[i-1])
+                if prev_word in ["not", "no", "tidak", "bukan", "never", "jangan"]:
+                    val = -val
+            
             score += val
             if val > 0:
                 positive.append(w_clean)

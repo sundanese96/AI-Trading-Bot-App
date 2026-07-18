@@ -1,6 +1,7 @@
 import httpx
 import os
 from backend.database import load_ai_config
+from backend.config import VERIFY_SSL
 
 # Load Telegram credentials from environment
 TELEGRAM_BOT_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN", "")
@@ -58,7 +59,7 @@ async def send_telegram_alert(message: str):
     }
     
     try:
-        async with httpx.AsyncClient(verify=False) as client:
+        async with httpx.AsyncClient(verify=VERIFY_SSL) as client:
             res = await client.post(url, json=payload, timeout=10.0)
             if res.status_code != 200:
                 print(f"[Telegram Alert] Failed to send alert: {res.text}")
@@ -69,4 +70,3 @@ async def send_telegram_alert(message: str):
     except Exception as e:
         print(f"[Telegram Alert] Exception occurred: {str(e)}")
         log_telegram_notification(chat_id, message, f"FAILED (Exception: {str(e)})")
-

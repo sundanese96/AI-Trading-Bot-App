@@ -2,6 +2,7 @@ import time
 import httpx
 from typing import Dict, Any, List
 from backend.database import load_ai_config
+from backend.config import VERIFY_SSL
 from backend.services.binance_client import (
     FUTURES_BASE_URL,
     generate_signature,
@@ -31,7 +32,7 @@ async def get_binance_account_info() -> Dict[str, Any]:
         url = f"{FUTURES_BASE_URL}/fapi/v2/account?{query}&signature={signature}"
         headers = await get_binance_headers(api_key)
         
-        async with httpx.AsyncClient(verify=False) as client:
+        async with httpx.AsyncClient(verify=VERIFY_SSL) as client:
             res = await client.get(url, headers=headers, timeout=10.0)
             if res.status_code == 200:
                 data = res.json()
@@ -69,7 +70,7 @@ async def get_binance_positions() -> List[Dict[str, Any]]:
         url = f"{FUTURES_BASE_URL}/fapi/v2/positionRisk?{query}&signature={signature}"
         headers = await get_binance_headers(api_key)
         
-        async with httpx.AsyncClient(verify=False) as client:
+        async with httpx.AsyncClient(verify=VERIFY_SSL) as client:
             res = await client.get(url, headers=headers, timeout=10.0)
             if res.status_code == 200:
                 positions_data = res.json()
@@ -108,7 +109,7 @@ async def get_binance_open_orders() -> List[Dict[str, Any]]:
         url = f"{FUTURES_BASE_URL}/fapi/v1/openOrders?{query}&signature={signature}"
         headers = await get_binance_headers(api_key)
         
-        async with httpx.AsyncClient(verify=False) as client:
+        async with httpx.AsyncClient(verify=VERIFY_SSL) as client:
             res = await client.get(url, headers=headers, timeout=10.0)
             if res.status_code == 200:
                 orders_data = res.json()
@@ -150,7 +151,7 @@ async def cancel_binance_order(symbol: str, order_id: int) -> Dict[str, Any]:
         url = f"{FUTURES_BASE_URL}/fapi/v1/order?{query}&signature={signature}"
         headers = await get_binance_headers(api_key)
         
-        async with httpx.AsyncClient(verify=False) as client:
+        async with httpx.AsyncClient(verify=VERIFY_SSL) as client:
             res = await client.delete(url, headers=headers, timeout=10.0)
             if res.status_code == 200:
                 return {"status": "success", "message": "Order successfully cancelled.", "data": res.json()}
@@ -177,7 +178,7 @@ async def close_binance_position(symbol: str, side: str, quantity: float, positi
         headers = await get_binance_headers(api_key)
         url = f"{FUTURES_BASE_URL}/fapi/v1/order"
         
-        async with httpx.AsyncClient(verify=False) as client:
+        async with httpx.AsyncClient(verify=VERIFY_SSL) as client:
             res = await client.post(url, headers=headers, content=payload, timeout=10.0)
             if res.status_code == 200:
                 return {

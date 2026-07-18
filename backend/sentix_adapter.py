@@ -2,13 +2,14 @@
 Sentix UI Compatibility Adapter for FastAPI Backend.
 Maps Express-style endpoints to FastAPI routes so the Sentix React UI works seamlessly.
 """
+from backend.core.logger import logger
 import time
 import json
 import asyncio
 from typing import Dict, Any, List
 from fastapi import APIRouter, Request, Response
 from backend.config import DB_PATH
-from backend.database import db_lock, read_database, write_database, load_ai_config, save_ai_config
+from backend.database import db_lock, read_database, read_database_async, write_database, read_database_async, write_database_async, load_ai_config, save_ai_config
 
 router = APIRouter()
 
@@ -57,7 +58,7 @@ def _load_sentix_db():
                         else:
                             sentix_state[key] = data[key]
         except Exception as e:
-            print(f"[Sentix Adapter] Error loading db.json: {e}")
+            logger.error(f"[Sentix Adapter] Error loading db.json: {e}")
 
 def _save_sentix_db():
     """Persist sentix state to db.json."""
@@ -66,7 +67,7 @@ def _save_sentix_db():
             with open(SENTIX_DB_FILE, "w", encoding="utf-8") as f:
                 json.dump(sentix_state, f, indent=2)
         except Exception as e:
-            print(f"[Sentix Adapter] Error saving db.json: {e}")
+            logger.error(f"[Sentix Adapter] Error saving db.json: {e}")
 
 # Load on import
 _load_sentix_db()
@@ -161,12 +162,11 @@ async def execute_trade(request: Request):
     _save_sentix_db()
     return {"success": True, "message": "Order berhasil dieksekusi.", "trades": sentix_state["trades"]}
 
-def close_active_position(trade_id: str, exit_price: float = None) -> Dict[str, Any]:
+async def close_active_position(trade_id: str, exit_price: float = None) -> Dict[str, Any]:
     """
     Modular function to close an active position in both sentix_state (db.json)
     and database.json, updating portfolio balances, calculating PnL, and saving databases.
     """
-    _load_sentix_db()
     
     trade = next((t for t in sentix_state["trades"] if t["id"] == trade_id and t["status"] == "OPEN"), None)
     if not trade:
@@ -195,10 +195,10 @@ def close_active_position(trade_id: str, exit_price: float = None) -> Dict[str, 
     
     # Try to close matching trade in database.json
     try:
-        from backend.database import read_database, write_database, db_lock
+        from backend.database import read_database, write_database, read_database_async, write_database_async, db_lock
         
         # Open and update database.json
-        db = read_database()
+        db = await read_database_async()
         db_trades = db.get("savedTrades", [])
         db_updated = False
         
@@ -235,18 +235,17 @@ def close_active_position(trade_id: str, exit_price: float = None) -> Dict[str, 
                     db_updated = True
                 
         if db_updated:
-            write_database(db)
+            await write_database_async(db)
             
     except Exception as e:
-        print(f"[Sentix Adapter] Error closing matching trade in database.json: {e}")
+        logger.error(f"[Sentix Adapter] Error closing matching trade in database.json: {e}")
         
     return {"success": True, "message": "Posisi berhasil ditutup.", "trades": sentix_state["trades"]}
 
-def close_active_position_by_timestamp(timestamp: int, exit_price: float, reason: str = "AUTO") -> bool:
+async def close_active_position_by_timestamp(timestamp: int, exit_price: float, reason: str = "AUTO") -> bool:
     """
     Closes an active position in Sentix (db.json) matching the given timestamp (fuzzy matched).
     """
-    _load_sentix_db()
     
     # Try exact match first
     trade = next((t for t in sentix_state["trades"] if t["status"] == "OPEN" and t.get("timestamp") == timestamp), None)
@@ -284,7 +283,7 @@ async def close_trade(request: Request):
     if not trade_id:
         return {"success": False, "message": "ID Transaksi wajib diisi."}
     
-    return close_active_position(trade_id)
+    return await close_active_position(trade_id)
 
 
 # ==========================================
@@ -347,7 +346,6 @@ async def save_ai_bot_settings(request: Request):
 
 @router.get("/api/ai-bot/status")
 async def get_ai_bot_status(response: Response):
-    _load_sentix_db()
     response.headers["Cache-Control"] = "no-cache, no-store, must-revalidate"
     response.headers["Pragma"] = "no-cache"
     response.headers["Expires"] = "0"
@@ -446,7 +444,7 @@ async def save_notification_settings(request: Request):
             config["telegramChatId"] = body["telegramChatId"]
         await save_ai_config(config)
     except Exception as e:
-        print(f"[Sentix Adapter] Sync to main config failed: {e}")
+        logger.error(f"[Sentix Adapter] Sync to main config failed: {e}")
         
     return {"success": True}
 
@@ -582,7 +580,7 @@ async def get_ml_models():
                         })
                         seen_ids.add(model_id)
     except Exception as e:
-        print(f"[Sentix Adapter] Error scanning pre-trained models: {e}")
+        logger.error(f"[Sentix Adapter] Error scanning pre-trained models: {e}")
 
     return {"success": True, "models": models}
 
@@ -678,7 +676,7 @@ async def train_ml_model(request: Request):
             }
         }
     except Exception as e:
-        print(f"[Sentix Adapter] Training endpoint error: {e}")
+        logger.error(f"[Sentix Adapter] Training endpoint error: {e}")
         return {"success": False, "message": str(e)}
 
 @router.post("/api/gemini/forecast")
@@ -789,111 +787,20 @@ async def gemini_forecast(request: Request):
             
         return {"success": True, "advisory": parsed}
     except Exception as e:
-        print(f"[AI Advisor Error] Falling back to simulation. Error: {e}")
+        logger.error(f"[AI Advisor Error] Falling back to simulation. Error: {e}")
         return {"success": True, "advisory": {
             **simulated_advisory,
             "reasoning": f"Gagal memanggil provider {provider} (Fallback: {str(e)[:80]}). {simulated_advisory['reasoning']}"
         }}
 
 # --- Backtest technical indicator helpers ---
-def calculate_sma(prices, period):
-    smas = [None] * len(prices)
-    for i in range(period - 1, len(prices)):
-        smas[i] = sum(prices[i - period + 1 : i + 1]) / period
-    return smas
-
-def calculate_ema(prices, period):
-    emas = [None] * len(prices)
-    if len(prices) < period:
-        return emas
-    # Seed with SMA
-    emas[period - 1] = sum(prices[:period]) / period
-    multiplier = 2 / (period + 1)
-    for i in range(period, len(prices)):
-        emas[i] = (prices[i] - emas[i - 1]) * multiplier + emas[i - 1]
-    return emas
-
-def calculate_rsi(prices, period=14):
-    rsi = [None] * len(prices)
-    if len(prices) <= period:
-        return rsi
-    
-    gains = []
-    losses = []
-    for i in range(1, len(prices)):
-        diff = prices[i] - prices[i - 1]
-        gains.append(max(0, diff))
-        losses.append(max(0, -diff))
-        
-    avg_gain = sum(gains[:period]) / period
-    avg_loss = sum(losses[:period]) / period
-    
-    if avg_loss == 0:
-        rsi[period] = 100
-    else:
-        rs = avg_gain / avg_loss
-        rsi[period] = 100 - (100 / (1 + rs))
-        
-    for i in range(period + 1, len(prices)):
-        gain = gains[i - 1]
-        loss = losses[i - 1]
-        avg_gain = (avg_gain * (period - 1) + gain) / period
-        avg_loss = (avg_loss * (period - 1) + loss) / period
-        if avg_loss == 0:
-            rsi[i] = 100
-        else:
-            rs = avg_gain / avg_loss
-            rsi[i] = 100 - (100 / (1 + rs))
-    return rsi
-
-def calculate_macd(prices):
-    ema12 = calculate_ema(prices, 12)
-    ema26 = calculate_ema(prices, 26)
-    macd_line = [None] * len(prices)
-    for i in range(len(prices)):
-        if ema12[i] is not None and ema26[i] is not None:
-            macd_line[i] = ema12[i] - ema26[i]
-            
-    macd_signal = [None] * len(prices)
-    start_idx = -1
-    for i in range(len(macd_line)):
-        if macd_line[i] is not None:
-            start_idx = i
-            break
-            
-    if start_idx != -1 and len(macd_line) - start_idx >= 9:
-        sum_macd = 0.0
-        for i in range(start_idx, start_idx + 9):
-            sum_macd += macd_line[i]
-        macd_signal[start_idx + 8] = sum_macd / 9
-        
-        multiplier = 2 / (9 + 1)
-        for i in range(start_idx + 9, len(macd_line)):
-            if macd_line[i] is not None and macd_signal[i - 1] is not None:
-                macd_signal[i] = (macd_line[i] - macd_signal[i - 1]) * multiplier + macd_signal[i - 1]
-                
-    macd_hist = [None] * len(prices)
-    for i in range(len(prices)):
-        if macd_line[i] is not None and macd_signal[i] is not None:
-            macd_hist[i] = macd_line[i] - macd_signal[i]
-            
-    return macd_line, macd_signal, macd_hist
-
-def calculate_bollinger_bands(prices, period=20, num_std=2):
-    middle = [None] * len(prices)
-    upper = [None] * len(prices)
-    lower = [None] * len(prices)
-    
-    for i in range(period - 1, len(prices)):
-        slice_prices = prices[i - period + 1 : i + 1]
-        mean = sum(slice_prices) / period
-        variance = sum((x - mean) ** 2 for x in slice_prices) / period
-        std = max(0.0, variance) ** 0.5
-        middle[i] = mean
-        upper[i] = mean + num_std * std
-        lower[i] = mean - num_std * std
-        
-    return middle, upper, lower
+from backend.services.indicators import (
+    calculate_sma,
+    calculate_ema,
+    calculate_rsi,
+    calculate_macd,
+    calculate_bollinger_bands,
+)
 
 def run_backtest_simulation(params: dict):
     symbol = params.get("symbol", "BTCUSDT")
@@ -924,7 +831,7 @@ def run_backtest_simulation(params: dict):
             if resp.status_code == 200:
                 klines = resp.json()
     except Exception as e:
-        print(f"[Backtester] Binance fetch failed: {e}. Falling back to simulation.")
+        logger.error(f"[Backtester] Binance fetch failed: {e}. Falling back to simulation.")
 
     # Generate synthetic candles if offline or fetch failed
     if not klines or len(klines) < 50:
@@ -1206,7 +1113,7 @@ async def run_backtest(request: Request):
         report = run_backtest_simulation(body)
         return {"success": True, "report": report}
     except Exception as e:
-        print(f"[Backtester Error] {e}")
+        logger.error(f"[Backtester Error] {e}")
         start_bal = body.get("startingBalance", 10000)
         return {"success": True, "report": {
             "params": body,

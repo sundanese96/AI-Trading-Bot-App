@@ -9,6 +9,7 @@ from typing import List, Dict, Any
 
 from backend.services import db_manager
 from backend.services.news import analyze_sentiment
+from backend.config import VERIFY_SSL
 
 # Keyword configuration matching user request
 KEYWORDS_MACRO = ['cpi', 'nfp', 'inflation', 'fed', 'fomc', 'interest rate', 'unemployment', 'gdp', 'suku bunga', 'inflasi']
@@ -64,7 +65,7 @@ async def scrape_google_news_historical(start_date: str, end_date: str, custom_k
         query_end_date = end_date
     
     try:
-        async with httpx.AsyncClient(verify=False) as client:
+        async with httpx.AsyncClient(verify=VERIFY_SSL) as client:
             for kw in keywords_to_use:
                 scraping_status.update({
                     "progress": f"Mencari kata kunci: '{kw}'...",
@@ -147,4 +148,3 @@ async def scrape_google_news_historical(start_date: str, end_date: str, custom_k
         
     print(f"[Scraper] Ingested {ingested_count} historical news articles between {start_date} and {end_date}.")
     return ingested_count
-

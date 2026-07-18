@@ -4,6 +4,7 @@ import httpx
 import asyncio
 import math
 from typing import List, Dict, Any
+from backend.config import VERIFY_SSL
 
 # Global Simulated State
 initial_assets = [
@@ -92,7 +93,7 @@ def calculate_news_sentiment_index(news_items: List[Dict[str, Any]]) -> Dict[str
 
 async def update_real_crypto_prices():
     symbols = ['BTC', 'ETH', 'SOL', 'XRP', 'BNB', 'ADA', 'SUI', 'DOGE']
-    async with httpx.AsyncClient(verify=False) as client:
+    async with httpx.AsyncClient(verify=VERIFY_SSL) as client:
         for sym in symbols:
             try:
                 response = await client.get(f"https://api.binance.com/api/v3/ticker/24hr?symbol={sym}USDT", timeout=5.0)
@@ -111,7 +112,7 @@ async def update_real_crypto_prices():
 async def update_fear_and_greed_index():
     global fng_cache
     try:
-        async with httpx.AsyncClient(verify=False) as client:
+        async with httpx.AsyncClient(verify=VERIFY_SSL) as client:
             response = await client.get("https://api.alternative.me/fng/?limit=1", timeout=5.0)
             if response.status_code == 200:
                 data = response.json()
@@ -207,8 +208,7 @@ async def market_simulation_loop():
                     "history": history
                 })
             
-            assets.clear()
-            assets.extend(new_assets)
+            assets[:] = new_assets
             
             if current_panic["active"]:
                 current_panic["timeLeft"] -= 1.5

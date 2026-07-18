@@ -4,6 +4,7 @@ import httpx
 from backend.database import load_ai_config, update_daily_stats, is_trade_processed, mark_trade_as_processed
 from backend.services.telegram_client import send_telegram_alert
 from backend.services.binance_client import FUTURES_BASE_URL, generate_signature, get_binance_headers
+from backend.config import VERIFY_SSL
 
 async def monitor_binance_positions_loop():
     """
@@ -28,7 +29,7 @@ async def monitor_binance_positions_loop():
                 await asyncio.sleep(10)
                 continue
 
-            async with httpx.AsyncClient(verify=False) as client:
+            async with httpx.AsyncClient(verify=VERIFY_SSL) as client:
                 # 1. Fetch current open positions from Binance Futures
                 timestamp = int(time.time() * 1000)
                 query = f"timestamp={timestamp}"
