@@ -201,6 +201,23 @@ async def _execute_simulated_trade(headline, target_asset, decision, confidence,
     sentix_state["aiBotLogs"].insert(0, log_entry)
     sentix_state["aiBotLogs"] = sentix_state["aiBotLogs"][:100]
     
+    # ADD TO NEWS FEED TO PREVENT DUPLICATES ON NEXT SCRAPE
+    from backend.main import news_feed
+    if not any(n.get("headline") == headline for n in news_feed):
+        news_feed.insert(0, {
+            "id": f"news-{int(time.time() * 1000)}",
+            "time": time.strftime("%H:%M:%S"),
+            "headline": headline,
+            "category": "AI_PROCESSED",
+            "impact": "HIGH" if decision in ["LONG", "SHORT"] else "NEUTRAL",
+            "source": "System/AI",
+            "details": f"Processed by AI Bot. Confidence: {confidence}%.",
+            "isTriggeredShort": decision == "SHORT",
+            "isTriggeredGold": False,
+            "summaryId": f"AI Bot Evaluated. Decision: {decision}"
+        })
+        if len(news_feed) > 50: news_feed.pop()
+    
     risk = _calculate_risk_parameters(bot_settings, live_price, decision, strategy)
     
     if decision in ["LONG", "SHORT"] and not veto_active and confidence >= threshold:

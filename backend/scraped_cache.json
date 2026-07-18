@@ -1,6 +1,6 @@
 {
   "forexfactory": {
-    "timestamp": 1784391459.1729913,
+    "timestamp": 1784392542.083435,
     "data": [
       {
         "title": "FF CALENDAR: GBP - BOE Gov Bailey Speaks (Medium Impact)",
@@ -131,11 +131,11 @@
     ]
   },
   "reuters": {
-    "timestamp": 1784391458.8861816,
+    "timestamp": 1784392541.804525,
     "data": []
   },
   "bbc": {
-    "timestamp": 1784391459.0856147,
+    "timestamp": 1784392541.9973555,
     "data": [
       {
         "title": "Russian online retail warehouses hit by deadly Ukrainian strikes",
@@ -153,8 +153,8 @@
         "source": "BBC Scraper"
       },
       {
-        "title": "Many Ukrainian soldiers outraged over removal of defence minister, troops tell BBC",
-        "url": "https://www.bbc.com/news/articles/cvg8w4dpjkwo",
+        "title": "UK's Burnham to announce plans for new North Sea oil and gas drilling",
+        "url": "https://www.bbc.com/news/articles/c935yx2z9d4o",
         "source": "BBC Scraper"
       },
       {
@@ -180,7 +180,7 @@
     ]
   },
   "cryptopanic": {
-    "timestamp": 1784391459.6012337,
+    "timestamp": 1784392542.7688863,
     "data": []
   }
 }
