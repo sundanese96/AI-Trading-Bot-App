@@ -64,8 +64,11 @@ def _save_sentix_db():
     """Persist sentix state to db.json."""
     with sentix_db_lock:
         try:
-            with open(SENTIX_DB_FILE, "w", encoding="utf-8") as f:
+            temp_file = str(SENTIX_DB_FILE) + ".tmp"
+            with open(temp_file, "w", encoding="utf-8") as f:
                 json.dump(sentix_state, f, indent=2)
+            import os
+            os.replace(temp_file, SENTIX_DB_FILE)
         except Exception as e:
             logger.error(f"[Sentix Adapter] Error saving db.json: {e}")
 

@@ -143,7 +143,9 @@ async def save_ai_config(config: dict):
         if "telegramBotToken" in encrypted_config:
             encrypted_config["telegramBotToken"] = encrypt_text(encrypted_config["telegramBotToken"])
             
-        db["aiConfig"] = encrypted_config
+        if "aiConfig" not in db:
+            db["aiConfig"] = {}
+        db["aiConfig"].update(encrypted_config)
         await write_database_async(db)
 
 async def load_ai_config() -> dict:

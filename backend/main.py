@@ -583,10 +583,18 @@ async def news_scraper_loop():
     while True:
         try:
             logger.info("[Scraper] Running periodic news scraper...")
-            reuters_news = await scrape_reuters_news()
-            bbc_news = await scrape_bbc_news()
-            ff_news = await fetch_forexfactory_calendar()
-            panic_news = await fetch_crypto_panic_news()
+            results = await asyncio.gather(
+                scrape_reuters_news(),
+                scrape_bbc_news(),
+                fetch_forexfactory_calendar(),
+                fetch_crypto_panic_news(),
+                return_exceptions=True
+            )
+            
+            reuters_news = results[0] if not isinstance(results[0], Exception) else []
+            bbc_news = results[1] if not isinstance(results[1], Exception) else []
+            ff_news = results[2] if not isinstance(results[2], Exception) else []
+            panic_news = results[3] if not isinstance(results[3], Exception) else []
             
             # Combine and process scraped news
             all_scraped = reuters_news + bbc_news + ff_news + panic_news

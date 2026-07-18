@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { LlmSettings } from "../../types";
 import { Cpu, Globe, Key, Save } from "lucide-react";
 
@@ -12,6 +12,13 @@ export function LlmConfig({ initialSettings, onSave }: Props) {
   const [apiKey, setApiKey] = useState(initialSettings.apiKey || "");
   const [baseUrl, setBaseUrl] = useState(initialSettings.baseUrl || "");
   const [modelName, setModelName] = useState(initialSettings.modelName || "");
+  
+  useEffect(() => {
+    setProvider(initialSettings.provider || "simulated");
+    setApiKey(initialSettings.apiKey || "");
+    setBaseUrl(initialSettings.baseUrl || "");
+    setModelName(initialSettings.modelName || "");
+  }, [initialSettings]);
   
   const [isSaving, setIsSaving] = useState(false);
   const [statusMessage, setStatusMessage] = useState({ text: "", isError: false });

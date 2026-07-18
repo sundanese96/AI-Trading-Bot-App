@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { NotificationSettings } from "../../types";
 import { Bell, Send, Mail, ShieldCheck, Save } from "lucide-react";
 
@@ -15,6 +15,15 @@ export function NotificationConfig({ initialSettings, onSave, onTest }: Props) {
   const [tradeExecuted, setTradeExecuted] = useState(initialSettings.tradeExecuted);
   const [riskTriggered, setRiskTriggered] = useState(initialSettings.riskTriggered);
   const [highSentimentAlert, setHighSentimentAlert] = useState(initialSettings.highSentimentAlert);
+
+  useEffect(() => {
+    setTelegramToken(initialSettings.telegramToken || "");
+    setTelegramChatId(initialSettings.telegramChatId || "");
+    setEmailAddress(initialSettings.emailAddress || "");
+    setTradeExecuted(initialSettings.tradeExecuted);
+    setRiskTriggered(initialSettings.riskTriggered);
+    setHighSentimentAlert(initialSettings.highSentimentAlert);
+  }, [initialSettings]);
 
   const [isSaving, setIsSaving] = useState(false);
   const [isTesting, setIsTesting] = useState(false);

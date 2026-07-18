@@ -5,6 +5,7 @@ import asyncio
 import math
 from typing import List, Dict, Any
 from backend.config import VERIFY_SSL
+from backend.core.logger import logger
 
 # Global Simulated State
 initial_assets = [
@@ -107,7 +108,7 @@ async def update_real_crypto_prices():
                             "change24h": change
                         }
             except Exception as e:
-                print(f"[Binance API] Failed to fetch real price for {sym}: {e}")
+                logger.error(f"[Binance API] Failed to fetch real price for {sym}: {e}")
 
 async def update_fear_and_greed_index():
     global fng_cache
@@ -119,10 +120,10 @@ async def update_fear_and_greed_index():
                 if data and data.get("data") and len(data["data"]) > 0:
                     fng_cache.clear()
                     fng_cache.update(data["data"][0])
-                    print(f"[FNG API] Updated index value: {fng_cache['value']} ({fng_cache['value_classification']})")
+                    logger.info(f"[FNG API] Updated index value: {fng_cache['value']} ({fng_cache['value_classification']})")
                     return
     except Exception as e:
-        print(f"[FNG API] Failed to fetch real Fear and Greed Index: {e}")
+        logger.error(f"[FNG API] Failed to fetch real Fear and Greed Index: {e}")
     
     # Fallback fluctuation
     val = int(fng_cache["value"])
@@ -220,7 +221,7 @@ async def market_simulation_loop():
                         "timeLeft": 0
                     }
         except Exception as e:
-            print(f"[Market Simulation] Error: {e}")
+            logger.error(f"[Market Simulation] Error: {e}")
             
         await asyncio.sleep(1.5)
 
