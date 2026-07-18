@@ -256,16 +256,20 @@ const [settings, setSettings] = useState<AiBotSettings>({
 
   useEffect(() => {
     if (!active) return;
+    
+    // Always fetch settings & initial status on mount/active
     fetchBotSettings();
     fetchBotStatus();
 
-    // Poll status statistics every 4 seconds, but do NOT poll/overwrite static settings
+    // Only start polling interval if automation is enabled
+    if (!botStatus.automationEnabled) return;
+
     const interval = setInterval(() => {
       fetchBotStatus();
     }, 4000);
 
     return () => clearInterval(interval);
-  }, [active]);
+  }, [active, botStatus.automationEnabled]);
 
   // Uptime timer: ticks every second showing elapsed time since bot was activated
   useEffect(() => {
@@ -374,9 +378,15 @@ const [settings, setSettings] = useState<AiBotSettings>({
   const handleClearLogs = async () => {
     try {
       const response = await fetch("/api/ai-bot/logs/clear", { method: "POST" });
-        setBotStatus((prev) => ({ ...prev, logs: [] }));
+      if (response.ok) {
+        const data = await response.json();
+        setBotStatus((prev) => ({ ...prev, logs: data.logs || [] }));
+      } else {
+        alert("Gagal membersihkan log: " + (await response.json()).message || "Server error.");
+      }
     } catch (e) {
       console.error("Gagal membersihkan log aktivitas bot:", e);
+      alert("Network error. Cek koneksi.");
     }
   };
 

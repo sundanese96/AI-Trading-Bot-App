@@ -1,0 +1,1 @@
+Jalankan env python via /media/sun/DATA/PythonEnv/ComfyUI/venv/bin, jangan pakai path system linux

@@ -296,15 +296,21 @@ export default function App() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ tradeId }),
       });
-      if (response.ok) {
-        const resData = await response.json();
-        if (resData.success) {
-          fetchBackendState();
-        } else {
+
+      if (!response.ok) {
+        try {
+          const resData = await response.json();
           alert(resData.message || "Gagal melikuidasi posisi.");
+        } catch {
+          alert("Server error. Cek log backend.");
         }
+        return;
+      }
+
+      const resData = await response.json();
+      if (resData.success) {
+        fetchBackendState();
       } else {
-        const resData = await response.json();
         alert(resData.message || "Gagal melikuidasi posisi.");
       }
     } catch (e: any) {
@@ -444,9 +450,19 @@ export default function App() {
       if (response.ok) {
         fetchBackendState();
         setConfirmReset(false);
+      } else {
+        try {
+          const resData = await response.json();
+          alert(resData.message || "Gagal mereset portofolio.");
+        } catch {
+          alert("Server error. Cek log backend.");
+        }
+        setConfirmReset(false);
       }
     } catch (err) {
       console.error(err);
+      alert("Error: " + err.message);
+      setConfirmReset(false);
     }
   };
 

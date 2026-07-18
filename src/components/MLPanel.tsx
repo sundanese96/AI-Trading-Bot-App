@@ -100,6 +100,7 @@ const response = await onTrainModel({
     } catch (err: any) {
       alert(err.message || "Gagal melatih model lokal.");
       setIsTraining(false);
+      // FIX: clearInterval not needed here since interval was never set
     }
   };
 

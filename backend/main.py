@@ -638,9 +638,13 @@ async def news_scraper_loop():
             
             # Load AI config to see if we should auto-run AI analysis
             from backend.database import load_ai_config
+            from backend.sentix_adapter import sentix_state
             config = await load_ai_config() or {}
             is_dry_run = config.get("dryRun", True)
             is_locked = config.get("isLocked", False)
+            
+            bot_settings = sentix_state.get("aiBotSettings", {})
+            enabled = bot_settings.get("enabled", False)
             
             for item in all_scraped:
                 headline = item["title"]
@@ -653,8 +657,8 @@ async def news_scraper_loop():
                 if live_sim_manager.active:
                     await live_sim_manager.handle_new_news(item)
                 
-                # If bot is active (not locked) and dryRun is true, run the AI Analyst pipeline!
-                if is_dry_run and not is_locked:
+                # If bot is active (not locked), dryRun is true, and Strategy Automation is enabled, run the AI Analyst pipeline!
+                if is_dry_run and not is_locked and enabled:
                     await trigger_automated_trade_sim(item, config)
                 else:
                     # Non-simulation fallback: just do raw sentiment analysis and add to news_feed as before
@@ -1740,6 +1744,8 @@ Gunakan data real-time, volatilitas pasar, sentimen berita, indeks Fear & Greed,
             "impact": "CRITICAL" if parsed_analysis.get("sentiment") == "CRITICAL" else ("NEGATIVE" if parsed_analysis.get("sentiment") == "NEGATIVE" else "NEUTRAL"),
             "source": req.source or f"AI Analyst ({req.provider.upper()})",
             "details": parsed_analysis.get("analysisSummary", "Hasil analisis kecerdasan buatan."),
+            "forecast": getattr(req, "forecast", ""),
+            "previous": getattr(req, "previous", ""),
             "isTriggeredShort": is_triggered_short,
             "isTriggeredGold": is_triggered_gold,
             "summaryId": f"AI Terminal ({req.provider.upper()}): Crisis {parsed_analysis.get('crisisKeywords', [])} detected. Short signal: {'ACTIVE' if is_triggered_short else 'INACTIVE'}."
