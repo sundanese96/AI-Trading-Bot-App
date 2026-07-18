@@ -54,12 +54,22 @@ export function AIBotPanel({ savedModels, llmSettings, active }: AIBotPanelProps
   const uptimeTimer = useRef<number | null>(null);
   const startTime = useRef<number | null>(null);
 
-  const fetchBotSettings = async () => {
+  const fetchInitialSettings = async () => {
     try {
       const dataSettings = await apiBot.getSettings();
       if (dataSettings) {
         setSettings(prev => ({ ...prev, ...dataSettings }));
       }
+      await pollBotStatus();
+    } catch (e) {
+      console.error("Gagal memuat pengaturan awal AI Bot:", e);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const pollBotStatus = async () => {
+    try {
       const dataStatus = await apiBot.getStatus();
       if (dataStatus) {
         setBotStatus(dataStatus);
@@ -76,20 +86,18 @@ export function AIBotPanel({ savedModels, llmSettings, active }: AIBotPanelProps
       }
     } catch (e) {
       console.error("Gagal memuat status AI Bot:", e);
-    } finally {
-      setIsLoading(false);
     }
   };
 
   useEffect(() => {
-    fetchBotSettings();
+    fetchInitialSettings();
   }, []);
 
   // Poll status periodically if active
   useEffect(() => {
     if (!active) return;
     const interval = setInterval(() => {
-      fetchBotSettings();
+      pollBotStatus();
     }, (settings.runIntervalSeconds || 10) * 1000);
     return () => clearInterval(interval);
   }, [active, settings.runIntervalSeconds]);
@@ -252,7 +260,7 @@ export function AIBotPanel({ savedModels, llmSettings, active }: AIBotPanelProps
         <div className="lg:col-span-5 space-y-6">
           <BotLogsTable 
             botStatus={botStatus}
-            fetchBotSettings={fetchBotSettings}
+            fetchBotSettings={pollBotStatus}
             setBotStatus={setBotStatus}
             selectedTrade={selectedTrade}
             setSelectedTrade={setSelectedTrade}

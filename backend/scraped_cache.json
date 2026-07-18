@@ -1,6 +1,6 @@
 {
   "forexfactory": {
-    "timestamp": 1784395404.758721,
+    "timestamp": 1784397898.8925862,
     "data": [
       {
         "title": "FF CALENDAR: GBP - BOE Gov Bailey Speaks (Medium Impact)",
@@ -131,11 +131,11 @@
     ]
   },
   "reuters": {
-    "timestamp": 1784395404.3820155,
+    "timestamp": 1784397898.9450228,
     "data": []
   },
   "bbc": {
-    "timestamp": 1784395404.6632667,
+    "timestamp": 1784397898.9972425,
     "data": [
       {
         "title": "Russian online retail warehouses hit by deadly Ukrainian strikes",
@@ -148,13 +148,13 @@
         "source": "BBC Scraper"
       },
       {
-        "title": "German politician resigns over surrogacy child controversy",
-        "url": "https://www.bbc.com/news/articles/cq56e9n1ddzo",
+        "title": "Hungary's president agrees to stand down after parliament backs removal",
+        "url": "https://www.bbc.com/news/articles/cpd7q7eev7po",
         "source": "BBC Scraper"
       },
       {
-        "title": "UK's Burnham to announce plans for new North Sea oil and gas drilling",
-        "url": "https://www.bbc.com/news/articles/c935yx2z9d4o",
+        "title": "German politician resigns over surrogacy child controversy",
+        "url": "https://www.bbc.com/news/articles/cq56e9n1ddzo",
         "source": "BBC Scraper"
       },
       {
@@ -180,7 +180,7 @@
     ]
   },
   "cryptopanic": {
-    "timestamp": 1784395405.4765558,
+    "timestamp": 1784397899.168749,
     "data": []
   }
 }

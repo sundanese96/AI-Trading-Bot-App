@@ -137,7 +137,6 @@ export default function App() {
       const tRes = await fetch("/api/trades");
       if (tRes.ok) {
         const tData = await tRes.json();
-        // Backend might return an array directly or an object with 'trades' key
         let safeTrades = Array.isArray(tData) ? tData : (tData.trades || []);
         safeTrades = safeTrades.map((t: any) => ({
           ...t,
@@ -145,7 +144,13 @@ export default function App() {
         }));
         setTrades(safeTrades);
       }
+    } catch (e) {
+      console.error("Gagal sinkronisasi data dengan backend server:", e);
+    }
+  }, []);
 
+  const fetchInitialSettings = useCallback(async () => {
+    try {
       const nRes = await fetch("/api/notifications/settings");
       if (nRes.ok) {
         const nData = await nRes.json();
@@ -205,6 +210,10 @@ export default function App() {
   // Periodic Polling synchronization loops
   useEffect(() => {
     if (isAuthenticated !== true) return;
+    
+    // Initial fetch for settings that rarely change
+    fetchInitialSettings();
+
     fetchBackendState();
     fetchBinanceCandles();
 
@@ -222,7 +231,7 @@ export default function App() {
       clearInterval(fastSync);
       clearInterval(candleSync);
     };
-  }, [isAuthenticated, fetchBackendState, fetchBinanceCandles]);
+  }, [isAuthenticated, fetchBackendState, fetchBinanceCandles, fetchInitialSettings]);
 
   // Sync news logs once on mount
   useEffect(() => {

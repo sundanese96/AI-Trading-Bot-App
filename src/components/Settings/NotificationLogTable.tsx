@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useState } from "react";
 import { NotificationLog } from "../../types";
 import { CheckCircle, AlertTriangle } from "lucide-react";
 
@@ -7,9 +7,38 @@ interface Props {
 }
 
 export function NotificationLogTable({ logs }: Props) {
+  const [currentPage, setCurrentPage] = useState(1);
+  const [rowsPerPage, setRowsPerPage] = useState(10);
+
+  const totalPages = Math.max(1, Math.ceil(logs.length / rowsPerPage));
+  const startIndex = (currentPage - 1) * rowsPerPage;
+  const sortedLogs = [...logs].sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
+  const currentLogs = sortedLogs.slice(startIndex, startIndex + rowsPerPage);
+
   return (
     <div className="bg-slate-900/40 backdrop-blur-md border border-slate-800/60 rounded-2xl p-6 shadow-2xl">
-      <h4 className="font-sans font-bold text-white text-base mb-4">Log Pengiriman Aktivitas Notifikasi ({logs.length})</h4>
+      <div className="flex justify-between items-center mb-4">
+        <h4 className="font-sans font-bold text-white text-base">Log Pengiriman Aktivitas Notifikasi ({logs.length})</h4>
+        
+        {logs.length > 0 && (
+          <div className="flex items-center gap-2 text-xs font-mono text-slate-400">
+            <span>Tampilkan:</span>
+            <select
+              value={rowsPerPage}
+              onChange={(e) => {
+                setRowsPerPage(Number(e.target.value));
+                setCurrentPage(1);
+              }}
+              className="bg-slate-950 border border-slate-800 rounded px-2 py-1 outline-none focus:border-indigo-500"
+            >
+              <option value={10}>10</option>
+              <option value={20}>20</option>
+              <option value={50}>50</option>
+            </select>
+          </div>
+        )}
+      </div>
+
       {logs.length === 0 ? (
         <p className="text-xs text-slate-500 font-mono">Belum ada aktivitas pengiriman notifikasi dari server.</p>
       ) : (
@@ -25,13 +54,13 @@ export function NotificationLogTable({ logs }: Props) {
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-800/30 font-mono">
-              {logs.map((log) => {
+              {currentLogs.map((log) => {
                 const isSuccess = log.status === "SUCCESS";
                 const isSimulated = log.status === "SIMULATED";
                 return (
                   <tr key={log.id} className="hover:bg-slate-800/20 transition">
                     <td className="py-3.5 px-4 text-slate-500">
-                      {new Date(log.timestamp).toLocaleTimeString("id-ID")}
+                      {new Date(log.timestamp).toLocaleString("id-ID", { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit', second: '2-digit' })}
                     </td>
                     <td className="py-3.5 px-4">
                       <span className={`px-2 py-0.5 rounded font-bold text-[9px] ${
@@ -64,6 +93,34 @@ export function NotificationLogTable({ logs }: Props) {
               })}
             </tbody>
           </table>
+        </div>
+      )}
+
+      {/* Pagination Controls */}
+      {logs.length > 0 && (
+        <div className="flex justify-between items-center mt-4 pt-4 border-t border-slate-800/60 text-xs font-mono">
+          <span className="text-slate-500">
+            Menampilkan {startIndex + 1} - {Math.min(startIndex + rowsPerPage, logs.length)} dari {logs.length}
+          </span>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
+              disabled={currentPage === 1}
+              className="px-3 py-1 bg-slate-800 text-slate-300 rounded disabled:opacity-50 disabled:cursor-not-allowed hover:bg-slate-700 transition"
+            >
+              Prev
+            </button>
+            <span className="text-slate-400 font-bold px-2">
+              {currentPage} / {totalPages}
+            </span>
+            <button
+              onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
+              disabled={currentPage === totalPages}
+              className="px-3 py-1 bg-slate-800 text-slate-300 rounded disabled:opacity-50 disabled:cursor-not-allowed hover:bg-slate-700 transition"
+            >
+              Next
+            </button>
+          </div>
         </div>
       )}
     </div>

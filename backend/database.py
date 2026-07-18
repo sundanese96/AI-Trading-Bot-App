@@ -117,8 +117,11 @@ def read_database():
 
 def write_database(data):
     try:
-        with open(DB_PATH, "w", encoding="utf-8") as f:
+        temp_file = str(DB_PATH) + ".tmp"
+        with open(temp_file, "w", encoding="utf-8") as f:
             json.dump(data, f, indent=2)
+        import os
+        os.replace(temp_file, DB_PATH)
     except Exception as e:
         print(f"[DATABASE] Error writing database.json: {e}")
 

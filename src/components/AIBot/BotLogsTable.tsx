@@ -40,7 +40,7 @@ export function BotLogsTable({
   const handleClosePosition = async (tradeId: string) => {
     setIsClosingTrade(true);
     try {
-      const res = await fetch("/api/live-trading/close", {
+      const res = await fetch("/api/trade/close", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ tradeId })
