@@ -54,8 +54,16 @@ def _calculate_risk_parameters(bot_settings, live_price, decision, strategy):
     tp_pct = float(bot_settings.get("takeProfitPct", 3.0)) * float(bot_settings.get("tpMultiplier", 1.0))
     margin = float(bot_settings.get("allocationPerTrade", 1000.0))
     
+    risk_level = bot_settings.get("riskLevel", "MEDIUM")
+    if risk_level == "LOW":
+        lev_val = min(lev_val, 5)
+        sl_pct = min(sl_pct, 1.5)
+    elif risk_level == "MEDIUM":
+        lev_val = min(lev_val, 20)
+        sl_pct = min(sl_pct, 3.0)
+    
     if strategy == "HEDGING":
-        h_sl_pct, h_tp_pct = 1.5, 3.0
+        h_sl_pct, h_tp_pct = sl_pct, tp_pct # Use the capped sl_pct
         return {
             "lev": lev_val, "margin": margin,
             "long_sl": live_price * (1 - h_sl_pct / 100), "long_tp": live_price * (1 + h_tp_pct / 100),

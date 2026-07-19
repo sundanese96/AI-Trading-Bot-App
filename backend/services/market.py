@@ -96,21 +96,37 @@ def calculate_news_sentiment_index(news_items: List[Dict[str, Any]]) -> Dict[str
 
 async def update_real_crypto_prices():
     symbols = ['BTC', 'ETH', 'SOL', 'XRP', 'BNB', 'ADA', 'SUI', 'DOGE']
+    base_urls = [
+        "https://api.binance.com",
+        "https://api1.binance.com",
+        "https://api2.binance.com",
+        "https://api3.binance.com",
+        "https://api4.binance.com"
+    ]
     async with httpx.AsyncClient(verify=VERIFY_SSL) as client:
         for sym in symbols:
-            try:
-                response = await client.get(f"https://api.binance.com/api/v3/ticker/24hr?symbol={sym}USDT", timeout=5.0)
-                if response.status_code == 200:
-                    data = response.json()
-                    price = float(data.get("lastPrice", 0))
-                    change = float(data.get("priceChangePercent", 0))
-                    if price > 0:
-                        real_crypto_prices[sym] = {
-                            "price": price,
-                            "change24h": change
-                        }
-            except Exception as e:
-                logger.error(f"[Binance API] Failed to fetch real price for {sym}: {e}")
+            success = False
+            for base_url in base_urls:
+                if success:
+                    break
+                try:
+                    response = await client.get(f"{base_url}/api/v3/ticker/24hr?symbol={sym}USDT", timeout=5.0)
+                    if response.status_code == 200:
+                        data = response.json()
+                        price = float(data.get("lastPrice", 0))
+                        change = float(data.get("priceChangePercent", 0))
+                        if price > 0:
+                            real_crypto_prices[sym] = {
+                                "price": price,
+                                "change24h": change
+                            }
+                            success = True
+                except Exception as e:
+                    err_msg = str(e) or type(e).__name__
+                    logger.debug(f"[Binance API] Fallback {base_url} failed for {sym}: {err_msg}")
+            
+            if not success:
+                logger.error(f"[Binance API] All endpoints failed to fetch real price for {sym}")
 
 async def update_fear_and_greed_index():
     global fng_cache

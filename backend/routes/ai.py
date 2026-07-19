@@ -59,7 +59,7 @@ async def analyze_ai(req: AIAnalyzeRequest):
     
     target_asset = req.targetAsset or "BTC"
     
-    from backend.database import load_ai_config, read_database_async, write_database_async
+    from backend.database import load_ai_config, read_database_async, write_database_async, db_lock
     from backend.sentix_adapter import sentix_state
     config = await load_ai_config() or {}
     bot_settings = sentix_state.get("aiBotSettings", {})
@@ -176,24 +176,25 @@ async def analyze_ai(req: AIAnalyzeRequest):
         }
 
         try:
-            db = await read_database_async()
-            if "savedAnalyses" not in db:
-                db["savedAnalyses"] = []
-            db["savedAnalyses"].insert(0, {
-                "id": generated_event["id"],
-                "timestamp": int(time.time() * 1000),
-                "headline": req.headline,
-                "source": generated_event["source"],
-                "analysis": final_analysis,
-                "event": generated_event,
-                "marketMetrics": {
-                    "volatilities": [{ "symbol": a["symbol"], "pctVol": calculate_asset_volatility(a["history"])["pctVolatility"] } for a in assets],
-                    "fng": int(fng_cache["value"]),
-                    "newsSentimentScore": news_sentiment["score"]
-                }
-            })
-            db["savedAnalyses"] = db["savedAnalyses"][:50]
-            await write_database_async(db)
+            async with db_lock:
+                db = await read_database_async()
+                if "savedAnalyses" not in db:
+                    db["savedAnalyses"] = []
+                db["savedAnalyses"].insert(0, {
+                    "id": generated_event["id"],
+                    "timestamp": int(time.time() * 1000),
+                    "headline": req.headline,
+                    "source": generated_event["source"],
+                    "analysis": final_analysis,
+                    "event": generated_event,
+                    "marketMetrics": {
+                        "volatilities": [{ "symbol": a["symbol"], "pctVol": calculate_asset_volatility(a["history"])["pctVolatility"] } for a in assets],
+                        "fng": int(fng_cache["value"]),
+                        "newsSentimentScore": news_sentiment["score"]
+                    }
+                })
+                db["savedAnalyses"] = db["savedAnalyses"][:50]
+                await write_database_async(db)
         except Exception as db_err:
             logger.error(f"[DATABASE] Failed to save fallback analysis: {db_err}")
 
@@ -507,45 +508,63 @@ Gunakan data real-time, volatilitas pasar, sentimen berita, indeks Fear & Greed,
                     from backend.services.ml.inference import fetch_recent_candles, predict_live_with_gate
                     
                     df_recent = await fetch_recent_candles(target_asset, count=120, interval="5m")
-                    model_type = config.get("mlModelType", "xgboost")
-                    resample_min = 5
+                    model_type = bot_settings.get("modelType", config.get("mlModelType", "xgboost"))
+                    resample_min = bot_settings.get("timeframeMinutes", 5)
                     
                     ml_prediction, ml_confidence, is_ood, ood_violations, meta_p_win, meta_approved, meta_evaluated = predict_live_with_gate(
                         df_recent, model_type=model_type, resample_minutes=resample_min
                     )
                 
-                    logger.info(f"[Veto Gate] LLM proposed {llm_decision} on {target_asset}.")
-                    logger.info(f"[Veto Gate] ML predict: {ml_prediction} (confidence: {ml_confidence:.4f}), is_ood: {is_ood}")
-                    logger.info(f"[Veto Gate] Meta-model: P(win)={meta_p_win if meta_p_win is not None else 0.0:.4f}, Approved={meta_approved}, Evaluated={meta_evaluated}")
+                    logger.info(f"[Decision Fusion] LLM proposed {llm_decision} on {target_asset}.")
+                    logger.info(f"[Decision Fusion] ML predict: {ml_prediction} (confidence: {ml_confidence:.4f}), is_ood: {is_ood}")
+                    logger.info(f"[Decision Fusion] Meta-model: P(win)={meta_p_win if meta_p_win is not None else 0.0:.4f}, Approved={meta_approved}, Evaluated={meta_evaluated}")
                     
-                    veto_thresh = 0.35
+                    ml_weight = bot_settings.get("mlWeight", 0.5)
+                    llm_weight = bot_settings.get("llmWeight", 0.5)
                     
                     if is_ood:
-                        logger.info(f"[Veto Gate] OOD Guard active. Market anomaly detected.")
+                        logger.info(f"[Decision Fusion] OOD Guard active. Market anomaly detected.")
                         veto_active = True
                         veto_reason = f"OOD Guard Active ({len(ood_violations)} violations) - conservative HOLD triggered."
                         if not bypass_veto:
-                            logger.info(f"[Veto Gate] Overriding LLM decision to HOLD out of caution.")
+                            logger.info(f"[Decision Fusion] Overriding LLM decision to HOLD out of caution.")
                             ai_decision["decision"] = "HOLD"
                             parsed_analysis["tradeDecision"] = ai_decision
                     else:
-                        if llm_decision == "LONG" and ml_prediction == -1 and ml_confidence >= veto_thresh:
-                            veto_active = True
-                            veto_reason = f"ML opposes with DOWN prediction (confidence {ml_confidence:.2%})"
-                        elif llm_decision == "SHORT" and ml_prediction == 1 and ml_confidence >= veto_thresh:
-                            veto_active = True
-                            veto_reason = f"ML opposes with UP prediction (confidence {ml_confidence:.2%})"
-                        elif ml_prediction == 0:
-                            veto_active = True
-                            veto_reason = "ML Neutral - No Directional Confirmation"
-                        if veto_active and not is_ood:
-                            logger.info(f"[Veto Gate] VETO TRIGGERED! Reason: {veto_reason}.")
-                            if not bypass_veto:
-                                logger.info(f"[Veto Gate] Overriding LLM decision {llm_decision} to HOLD.")
-                                ai_decision["decision"] = "HOLD"
-                                parsed_analysis["tradeDecision"] = ai_decision
-                            else:
-                                logger.info(f"[Veto Gate] Strategy is {strategy_name} — bypassing veto override.")
+                        llm_conf = float(ai_decision.get("confidence", 50)) / 100.0
+                        if llm_decision == "SHORT": llm_conf = -llm_conf
+                        elif llm_decision == "HOLD": llm_conf = 0.0
+                        
+                        ml_conf = float(ml_confidence)
+                        if ml_prediction == -1: ml_conf = -ml_conf
+                        elif ml_prediction == 0: ml_conf = 0.0
+                        
+                        # Fusion score calculation
+                        fusion_score = (llm_conf * llm_weight) + (ml_conf * ml_weight)
+                        logger.info(f"[Decision Fusion] Fusion Score: {fusion_score:.4f} (LLM: {llm_conf:.2f}*{llm_weight}, ML: {ml_conf:.2f}*{ml_weight})")
+                        
+                        decision_threshold = 0.15
+                        if fusion_score > decision_threshold:
+                            final_decision = "LONG"
+                        elif fusion_score < -decision_threshold:
+                            final_decision = "SHORT"
+                        else:
+                            final_decision = "HOLD"
+                            
+                        max_w = max(llm_weight, ml_weight) if max(llm_weight, ml_weight) > 0 else 1.0
+                        fused_confidence_pct = int(min(100, abs(fusion_score) * 100 * (1.0 / max_w)))
+                        
+                        if not bypass_veto:
+                            if final_decision != llm_decision:
+                                logger.info(f"[Decision Fusion] Overriding LLM {llm_decision} -> {final_decision} (Score: {fusion_score:.2f})")
+                                veto_active = True
+                                veto_reason = f"Decision Fusion resolved to {final_decision} (Score: {fusion_score:.2f})"
+                            
+                            ai_decision["decision"] = final_decision
+                            ai_decision["confidence"] = fused_confidence_pct
+                            parsed_analysis["tradeDecision"] = ai_decision
+                        else:
+                            logger.info(f"[Decision Fusion] Strategy is {strategy_name} — bypassing fusion override.")
                 except Exception as ml_err:
                     logger.error(f"[Veto Gate] Error running ML confirmation/veto gate: {ml_err}.")
                     veto_active = True
@@ -604,24 +623,25 @@ Gunakan data real-time, volatilitas pasar, sentimen berita, indeks Fear & Greed,
             current_panic.update({ "active": True, "type": "MACRO", "title": req.headline, "timeLeft": 15 })
 
         try:
-            db = await read_database_async()
-            if "savedAnalyses" not in db:
-                db["savedAnalyses"] = []
-            db["savedAnalyses"].insert(0, {
-                "id": generated_event["id"],
-                "timestamp": int(time.time() * 1000),
-                "headline": req.headline,
-                "source": generated_event["source"],
-                "analysis": parsed_analysis,
-                "event": generated_event,
-                "marketMetrics": {
-                    "volatilities": [{ "symbol": a["symbol"], "pctVol": calculate_asset_volatility(a["history"])["pctVolatility"] } for a in assets],
-                    "fng": int(fng_cache["value"]),
-                    "newsSentimentScore": news_sentiment["score"]
-                }
-            })
-            db["savedAnalyses"] = db["savedAnalyses"][:50]
-            await write_database_async(db)
+            async with db_lock:
+                db = await read_database_async()
+                if "savedAnalyses" not in db:
+                    db["savedAnalyses"] = []
+                db["savedAnalyses"].insert(0, {
+                    "id": generated_event["id"],
+                    "timestamp": int(time.time() * 1000),
+                    "headline": req.headline,
+                    "source": generated_event["source"],
+                    "analysis": parsed_analysis,
+                    "event": generated_event,
+                    "marketMetrics": {
+                        "volatilities": [{ "symbol": a["symbol"], "pctVol": calculate_asset_volatility(a["history"])["pctVolatility"] } for a in assets],
+                        "fng": int(fng_cache["value"]),
+                        "newsSentimentScore": news_sentiment["score"]
+                    }
+                })
+                db["savedAnalyses"] = db["savedAnalyses"][:50]
+                await write_database_async(db)
         except Exception as db_err:
             logger.error(f"[DATABASE] Failed to save analysis: {db_err}")
 

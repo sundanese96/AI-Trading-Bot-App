@@ -360,8 +360,9 @@ async def get_ai_bot_settings(response: Response):
 @router.post("/api/ai-bot/settings")
 async def save_ai_bot_settings(request: Request):
     body = await request.json()
-    sentix_state["aiBotSettings"].update(body)
-    _save_sentix_db()
+    async with sentix_state_lock:
+        sentix_state["aiBotSettings"].update(body)
+        _save_sentix_db()
     return {"success": True, "message": "Konfigurasi AI Bot berhasil disimpan."}
 
 @router.get("/api/ai-bot/status")

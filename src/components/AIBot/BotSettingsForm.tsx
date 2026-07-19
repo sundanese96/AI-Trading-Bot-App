@@ -214,10 +214,25 @@ export function BotSettingsForm({ settings, setSettings }: Props) {
           </div>
         </div>
 
-        {/* Leverage, Confidence, and Interval Settings */}
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+        {/* Leverage, Allocation, Confidence, and Interval Settings */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
           <div className="space-y-1.5">
-            <label className="text-slate-400 font-mono">BATAS MINIMAL KEYAKINAN (%)</label>
+            <label className="text-slate-400 font-mono text-[10px]">ALOKASI DANA / TRADE</label>
+            <div className="flex items-center gap-2">
+              <input
+                type="number"
+                min="5"
+                max="10000"
+                value={settings.allocationPerTrade || 10}
+                onChange={(e) => setSettings((prev) => ({ ...prev, allocationPerTrade: parseInt(e.target.value) || 10 }))}
+                className="w-full bg-slate-950 border border-slate-800 focus:border-indigo-500 rounded-xl px-3 py-2.5 outline-none font-mono text-white"
+              />
+              <span className="text-slate-500 font-mono text-xs">USDT</span>
+            </div>
+            <p className="text-[9px] text-slate-500">Margin awal yang dialokasikan per posisi bot.</p>
+          </div>
+          <div className="space-y-1.5">
+            <label className="text-slate-400 font-mono text-[10px]">MIN. KEYAKINAN (%)</label>
             <div className="flex items-center gap-2">
               <input
                 type="number"
@@ -227,13 +242,13 @@ export function BotSettingsForm({ settings, setSettings }: Props) {
                 onChange={(e) => setSettings((prev) => ({ ...prev, minConfidence: parseInt(e.target.value) || 65 }))}
                 className="w-full bg-slate-950 border border-slate-800 focus:border-indigo-500 rounded-xl px-3 py-2.5 outline-none font-mono text-white"
               />
-              <span className="text-slate-500 font-mono">%</span>
+              <span className="text-slate-500 font-mono text-xs">%</span>
             </div>
-            <p className="text-[10px] text-slate-500">Robot hanya akan membuka posisi jika nilai keyakinan di atas batas ini.</p>
+            <p className="text-[9px] text-slate-500">Syarat minimal confidence dari AI sebelum open trade.</p>
           </div>
 
           <div className="space-y-1.5">
-            <label className="text-slate-400 font-mono">LEVERAGE (DAYA UNGKIT)</label>
+            <label className="text-slate-400 font-mono text-[10px]">LEVERAGE (DAYA UNGKIT)</label>
             <div className="flex items-center gap-2">
               <input
                 type="number"
@@ -243,13 +258,13 @@ export function BotSettingsForm({ settings, setSettings }: Props) {
                 onChange={(e) => setSettings((prev) => ({ ...prev, leverage: parseInt(e.target.value) || 10 }))}
                 className="w-full bg-slate-950 border border-slate-800 focus:border-indigo-500 rounded-xl px-3 py-2.5 outline-none font-mono text-white"
               />
-              <span className="text-slate-400 font-mono">x</span>
+              <span className="text-slate-400 font-mono text-xs">x</span>
             </div>
-            <p className="text-[10px] text-slate-500">Pengali margin untuk meningkatkan daya beli transaksi (maks 125x).</p>
+            <p className="text-[9px] text-slate-500">Pengali margin untuk daya beli (maks 125x).</p>
           </div>
 
           <div className="space-y-1.5">
-            <label className="text-slate-400 font-mono">INTERVAL DETIK EVALUASI</label>
+            <label className="text-slate-400 font-mono text-[10px]">INTERVAL EVALUASI</label>
             <div className="flex items-center gap-2">
               <input
                 type="number"
@@ -259,9 +274,9 @@ export function BotSettingsForm({ settings, setSettings }: Props) {
                 onChange={(e) => setSettings((prev) => ({ ...prev, runIntervalSeconds: parseInt(e.target.value) || 10 }))}
                 className="w-full bg-slate-950 border border-slate-800 focus:border-indigo-500 rounded-xl px-3 py-2.5 outline-none font-mono text-white"
               />
-              <span className="text-slate-400 font-mono">s</span>
+              <span className="text-slate-400 font-mono text-xs">s</span>
             </div>
-            <p className="text-[10px] text-slate-500">Membatasi seberapa sering robot memicu panggilan model AI/LLM.</p>
+            <p className="text-[9px] text-slate-500">Frekuensi robot memanggil LLM (detik).</p>
           </div>
         </div>
 

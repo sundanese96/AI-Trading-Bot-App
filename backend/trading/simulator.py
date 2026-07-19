@@ -128,14 +128,16 @@ async def trigger_automated_trade_sim(item: Dict[str, Any], config: Dict[str, An
         if not is_headline_relevant(headline, source):
             logger.info(f"[Sim Trading] Skipping LLM for irrelevant headline: {headline}")
             sentiment_res = analyze_sentiment(headline)
-            news_feed.insert(0, {
-                "id": f"n-{int(time.time() * 1000)}", "time": time.strftime("%H:%M:%S"),
-                "headline": headline, "category": "GENERAL", "impact": "LOW", "source": source,
-                "details": f"Scraped from {source}. Sentiment score: {sentiment_res['score']}. Bypassed AI Bot Trade Analysis.",
-                "forecast": item.get("forecast", ""), "previous": item.get("previous", ""),
-                "isTriggeredShort": False, "isTriggeredGold": False, "summaryId": f"Scraped news. Bypassed AI Bot."
-            })
-            if len(news_feed) > 50: news_feed.pop()
+            from backend.services.news import news_feed_lock
+            async with news_feed_lock:
+                news_feed.insert(0, {
+                    "id": f"n-{int(time.time() * 1000)}", "time": time.strftime("%H:%M:%S"),
+                    "headline": headline, "category": "GENERAL", "impact": "LOW", "source": source,
+                    "details": f"Scraped from {source}. Sentiment score: {sentiment_res['score']}. Bypassed AI Bot Trade Analysis.",
+                    "forecast": item.get("forecast", ""), "previous": item.get("previous", ""),
+                    "isTriggeredShort": False, "isTriggeredGold": False, "summaryId": f"Scraped news. Bypassed AI Bot."
+                })
+                if len(news_feed) > 50: news_feed.pop()
             return
             
         from backend.sentix_adapter import sentix_state

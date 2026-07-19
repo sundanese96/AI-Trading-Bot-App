@@ -56,16 +56,30 @@ async def monitor_simulated_positions_loop():
                         triggered_close = False
                         close_reason = ""
                         
+                        from backend.sentix_adapter import sentix_state
+                        ts_pct = float(sentix_state.get("aiBotSettings", {}).get("trailingStopPct", 0.5))
+                        
+                        if decision == "LONG":
+                            trade["highestPrice"] = max(trade.get("highestPrice", cur_price), cur_price)
+                            if ts_pct > 0 and cur_price <= trade["highestPrice"] * (1 - ts_pct / 100):
+                                triggered_close = True
+                                close_reason = "TRAILING_STOP"
+                        else:
+                            trade["lowestPrice"] = min(trade.get("lowestPrice", cur_price), cur_price) if trade.get("lowestPrice") else cur_price
+                            if ts_pct > 0 and cur_price >= trade["lowestPrice"] * (1 + ts_pct / 100):
+                                triggered_close = True
+                                close_reason = "TRAILING_STOP"
+                        
                         # 1. Stop Loss check
-                        if price_change_pct <= -sl_pct:
+                        if not triggered_close and price_change_pct <= -sl_pct:
                             triggered_close = True
                             close_reason = "STOP_LOSS"
                         # 2. Take Profit check
-                        elif price_change_pct >= tp_pct:
+                        elif not triggered_close and price_change_pct >= tp_pct:
                             triggered_close = True
                             close_reason = "TAKE_PROFIT"
                         # 3. Timeout check (Configurable)
-                        else:
+                        elif not triggered_close:
                             from backend.sentix_adapter import sentix_state
                             max_hold_mins = int(sentix_state.get("aiBotSettings", {}).get("maxHoldMinutes", 0))
                             if max_hold_mins > 0 and int(time.time() * 1000) - trade.get("timestamp", 0) > max_hold_mins * 60 * 1000:
