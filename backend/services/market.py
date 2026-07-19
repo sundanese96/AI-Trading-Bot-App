@@ -43,7 +43,7 @@ real_crypto_prices = {
 }
 
 fng_cache = {
-    "value": "55",
+    "value": 55,
     "value_classification": "Neutral",
     "timestamp": str(int(time.time())),
     "time_until_update": "24000"
@@ -76,6 +76,8 @@ def calculate_news_sentiment_index(news_items: List[Dict[str, Any]]) -> Dict[str
         impact = item.get("impact")
         if impact == "CRITICAL":
             total_score -= 100
+        elif impact == "HIGH":
+            total_score -= 75
         elif impact == "NEGATIVE":
             total_score -= 50
         elif impact == "POSITIVE":
@@ -118,15 +120,18 @@ async def update_fear_and_greed_index():
             if response.status_code == 200:
                 data = response.json()
                 if data and data.get("data") and len(data["data"]) > 0:
-                    fng_cache.clear()
-                    fng_cache.update(data["data"][0])
+                    val_str = data["data"][0].get("value", "55")
+                    fng_cache["value"] = int(val_str)
+                    fng_cache["value_classification"] = data["data"][0].get("value_classification", "Neutral")
+                    fng_cache["timestamp"] = data["data"][0].get("timestamp", str(int(time.time())))
+                    fng_cache["time_until_update"] = data["data"][0].get("time_until_update", "24000")
                     logger.info(f"[FNG API] Updated index value: {fng_cache['value']} ({fng_cache['value_classification']})")
                     return
     except Exception as e:
         logger.error(f"[FNG API] Failed to fetch real Fear and Greed Index: {e}")
     
     # Fallback fluctuation
-    val = int(fng_cache["value"])
+    val = fng_cache["value"]
     fluctuation = random.randint(-1, 1)
     new_val = max(1, min(99, val + fluctuation))
     classification = "Neutral"
@@ -194,11 +199,13 @@ async def market_simulation_loop():
                     # If no panic, traditional assets float slightly
                     if asset["type"] != "crypto":
                         price = price * (1 + change_pct)
+                    else:
+                        price = price * (1 + (change_pct * 0.15)) # Add slight noise to crypto between 15s API updates
                 
                 is_small_asset = asset["symbol"] in ["XRP", "ADA", "DOGE"]
                 history = list(asset["history"][1:]) + [round(price, 4 if is_small_asset else 2)]
                 
-                if current_panic["active"] or asset["type"] != "crypto":
+                if current_panic["active"] or asset["type"] != "crypto" or asset["type"] == "crypto":
                     initial_price = asset["history"][0] if asset["history"] else price
                     change24h = ((price - initial_price) / initial_price) * 100
                 

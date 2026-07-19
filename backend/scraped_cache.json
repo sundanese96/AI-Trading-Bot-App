@@ -1,160 +1,132 @@
 {
   "forexfactory": {
-    "timestamp": 1784397898.8925862,
+    "timestamp": 1784439508.5048084,
     "data": [
       {
-        "title": "FF CALENDAR: GBP - BOE Gov Bailey Speaks (Medium Impact)",
+        "title": "FF CALENDAR: GBP - Claimant Count Change (High Impact)",
+        "url": "https://www.forexfactory.com/calendar",
+        "source": "ForexFactory Calendar",
+        "forecast": "28.3K",
+        "previous": "31.2K"
+      },
+      {
+        "title": "FF CALENDAR: GBP - Average Earnings Index 3m/y (Medium Impact)",
+        "url": "https://www.forexfactory.com/calendar",
+        "source": "ForexFactory Calendar",
+        "forecast": "4.5%",
+        "previous": "4.4%"
+      },
+      {
+        "title": "FF CALENDAR: GBP - CPI y/y (High Impact)",
+        "url": "https://www.forexfactory.com/calendar",
+        "source": "ForexFactory Calendar",
+        "forecast": "2.7%",
+        "previous": "2.8%"
+      },
+      {
+        "title": "FF CALENDAR: EUR - Main Refinancing Rate (High Impact)",
+        "url": "https://www.forexfactory.com/calendar",
+        "source": "ForexFactory Calendar",
+        "forecast": "2.40%",
+        "previous": "2.40%"
+      },
+      {
+        "title": "FF CALENDAR: EUR - Monetary Policy Statement (High Impact)",
         "url": "https://www.forexfactory.com/calendar",
         "source": "ForexFactory Calendar",
         "forecast": "",
         "previous": ""
-      },
-      {
-        "title": "FF CALENDAR: USD - Core CPI m/m (High Impact)",
-        "url": "https://www.forexfactory.com/calendar",
-        "source": "ForexFactory Calendar",
-        "forecast": "0.2%",
-        "previous": "0.2%"
-      },
-      {
-        "title": "FF CALENDAR: USD - Core CPI y/y (High Impact)",
-        "url": "https://www.forexfactory.com/calendar",
-        "source": "ForexFactory Calendar",
-        "forecast": "2.8%",
-        "previous": "2.9%"
-      },
-      {
-        "title": "FF CALENDAR: USD - CPI m/m (High Impact)",
-        "url": "https://www.forexfactory.com/calendar",
-        "source": "ForexFactory Calendar",
-        "forecast": "-0.1%",
-        "previous": "0.5%"
-      },
-      {
-        "title": "FF CALENDAR: USD - CPI y/y (High Impact)",
-        "url": "https://www.forexfactory.com/calendar",
-        "source": "ForexFactory Calendar",
-        "forecast": "3.8%",
-        "previous": "4.2%"
-      },
-      {
-        "title": "FF CALENDAR: USD - Fed Chairman Warsh Testifies (High Impact)",
-        "url": "https://www.forexfactory.com/calendar",
-        "source": "ForexFactory Calendar",
-        "forecast": "",
-        "previous": ""
-      },
-      {
-        "title": "FF CALENDAR: GBP - BOE Gov Bailey Speaks (High Impact)",
-        "url": "https://www.forexfactory.com/calendar",
-        "source": "ForexFactory Calendar",
-        "forecast": "",
-        "previous": ""
-      },
-      {
-        "title": "FF CALENDAR: USD - Core PPI m/m (High Impact)",
-        "url": "https://www.forexfactory.com/calendar",
-        "source": "ForexFactory Calendar",
-        "forecast": "0.3%",
-        "previous": "0.4%"
-      },
-      {
-        "title": "FF CALENDAR: USD - PPI m/m (High Impact)",
-        "url": "https://www.forexfactory.com/calendar",
-        "source": "ForexFactory Calendar",
-        "forecast": "0.0%",
-        "previous": "1.1%"
-      },
-      {
-        "title": "FF CALENDAR: USD - Fed Chairman Warsh Testifies (High Impact)",
-        "url": "https://www.forexfactory.com/calendar",
-        "source": "ForexFactory Calendar",
-        "forecast": "",
-        "previous": ""
-      },
-      {
-        "title": "FF CALENDAR: GBP - GDP m/m (High Impact)",
-        "url": "https://www.forexfactory.com/calendar",
-        "source": "ForexFactory Calendar",
-        "forecast": "0.0%",
-        "previous": "-0.1%"
-      },
-      {
-        "title": "FF CALENDAR: USD - Core Retail Sales m/m (Medium Impact)",
-        "url": "https://www.forexfactory.com/calendar",
-        "source": "ForexFactory Calendar",
-        "forecast": "0.0%",
-        "previous": "0.8%"
-      },
-      {
-        "title": "FF CALENDAR: USD - Philly Fed Manufacturing Index (Medium Impact)",
-        "url": "https://www.forexfactory.com/calendar",
-        "source": "ForexFactory Calendar",
-        "forecast": "12.7",
-        "previous": "10.3"
-      },
-      {
-        "title": "FF CALENDAR: USD - Retail Sales m/m (Medium Impact)",
-        "url": "https://www.forexfactory.com/calendar",
-        "source": "ForexFactory Calendar",
-        "forecast": "0.2%",
-        "previous": "0.9%"
       },
       {
         "title": "FF CALENDAR: USD - Unemployment Claims (Medium Impact)",
         "url": "https://www.forexfactory.com/calendar",
         "source": "ForexFactory Calendar",
-        "forecast": "216K",
-        "previous": "215K"
+        "forecast": "211K",
+        "previous": "208K"
       },
       {
-        "title": "FF CALENDAR: USD - President Trump Speaks (Medium Impact)",
+        "title": "FF CALENDAR: EUR - ECB Press Conference (High Impact)",
         "url": "https://www.forexfactory.com/calendar",
         "source": "ForexFactory Calendar",
         "forecast": "",
         "previous": ""
       },
       {
-        "title": "FF CALENDAR: USD - Prelim UoM Consumer Sentiment (Medium Impact)",
+        "title": "FF CALENDAR: GBP - Retail Sales m/m (Medium Impact)",
         "url": "https://www.forexfactory.com/calendar",
         "source": "ForexFactory Calendar",
-        "forecast": "51.0",
-        "previous": "48.9"
+        "forecast": "-0.1%",
+        "previous": "1.2%"
       },
       {
-        "title": "FF CALENDAR: USD - Prelim UoM Inflation Expectations (Medium Impact)",
+        "title": "FF CALENDAR: EUR - French Flash Manufacturing PMI (Medium Impact)",
         "url": "https://www.forexfactory.com/calendar",
         "source": "ForexFactory Calendar",
-        "forecast": "",
-        "previous": "4.6%"
+        "forecast": "51.2",
+        "previous": "50.7"
+      },
+      {
+        "title": "FF CALENDAR: EUR - French Flash Services PMI (Medium Impact)",
+        "url": "https://www.forexfactory.com/calendar",
+        "source": "ForexFactory Calendar",
+        "forecast": "47.7",
+        "previous": "47.4"
+      },
+      {
+        "title": "FF CALENDAR: EUR - German Flash Manufacturing PMI (Medium Impact)",
+        "url": "https://www.forexfactory.com/calendar",
+        "source": "ForexFactory Calendar",
+        "forecast": "50.5",
+        "previous": "50.0"
+      },
+      {
+        "title": "FF CALENDAR: EUR - German Flash Services PMI (Medium Impact)",
+        "url": "https://www.forexfactory.com/calendar",
+        "source": "ForexFactory Calendar",
+        "forecast": "49.0",
+        "previous": "46.8"
+      },
+      {
+        "title": "FF CALENDAR: GBP - Flash Manufacturing PMI (Medium Impact)",
+        "url": "https://www.forexfactory.com/calendar",
+        "source": "ForexFactory Calendar",
+        "forecast": "52.1",
+        "previous": "53.1"
+      },
+      {
+        "title": "FF CALENDAR: GBP - Flash Services PMI (Medium Impact)",
+        "url": "https://www.forexfactory.com/calendar",
+        "source": "ForexFactory Calendar",
+        "forecast": "49.4",
+        "previous": "48.7"
       }
     ]
   },
   "reuters": {
-    "timestamp": 1784397898.9450228,
+    "timestamp": 1784439508.5146637,
     "data": []
   },
   "bbc": {
-    "timestamp": 1784397898.9972425,
+    "timestamp": 1784439508.607932,
     "data": [
       {
-        "title": "Russian online retail warehouses hit by deadly Ukrainian strikes",
-        "url": "https://www.bbc.com/news/articles/clyxlm877p2o",
+        "title": "US and Iran exchange strikes after two US deaths in Jordan attack",
+        "url": "https://www.bbc.com/news/articles/cgk417jp83po",
         "source": "BBC Scraper"
       },
       {
-        "title": "Control, threats, disfiguring surgery: My life inside Jeffrey Epstein's 'cult'",
-        "url": "https://www.bbc.com/news/articles/czek5wl6p2go",
+        "title": "England beat France 6-4 in thrilling third-place match",
+        "url": "https://www.bbc.com/sport/football/live/cly5lj1nqdxt",
         "source": "BBC Scraper"
       },
       {
-        "title": "Hungary's president agrees to stand down after parliament backs removal",
-        "url": "https://www.bbc.com/news/articles/cpd7q7eev7po",
+        "title": "Andrew Tate and brother arrested in US after more charges laid against them in UK",
+        "url": "https://www.bbc.com/news/articles/cwymly9yd33o",
         "source": "BBC Scraper"
       },
       {
-        "title": "German politician resigns over surrogacy child controversy",
-        "url": "https://www.bbc.com/news/articles/cq56e9n1ddzo",
+        "title": "Russians turn to cash, putting more strain on slowing wartime economy",
+        "url": "https://www.bbc.com/news/articles/cglj255jk8ko",
         "source": "BBC Scraper"
       },
       {
@@ -168,19 +140,19 @@
         "source": "BBC Scraper"
       },
       {
-        "title": "Diamonds and 'cab to orbit': Rocket aiming to transform India's space ambitions takes off",
-        "url": "https://www.bbc.com/news/articles/clyekv7rld3o",
+        "title": "India's Ganesh idol makers count the cost of devastating floods",
+        "url": "https://www.bbc.com/news/articles/cp8r850e7z1o",
         "source": "BBC Scraper"
       },
       {
-        "title": "US strikes hit Iran for seventh consecutive night",
-        "url": "https://www.bbc.com/news/articles/cy748n8zx8ro",
+        "title": "Diamonds and 'cab to orbit': Rocket aiming to transform India's space ambitions takes off",
+        "url": "https://www.bbc.com/news/articles/clyekv7rld3o",
         "source": "BBC Scraper"
       }
     ]
   },
   "cryptopanic": {
-    "timestamp": 1784397899.168749,
+    "timestamp": 1784439508.769024,
     "data": []
   }
 }

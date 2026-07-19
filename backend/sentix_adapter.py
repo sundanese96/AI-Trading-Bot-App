@@ -9,9 +9,10 @@ import asyncio
 from typing import Dict, Any, List
 from fastapi import APIRouter, Request, Response
 from backend.config import DB_PATH
-from backend.database import db_lock, read_database, read_database_async, write_database, read_database_async, write_database_async, load_ai_config, save_ai_config
+from backend.database import db_lock, read_database, read_database_async, write_database, write_database_async, load_ai_config, save_ai_config
 
 router = APIRouter()
+sentix_state_lock = asyncio.Lock()
 
 # --- In-memory state for Sentix-compatible features ---
 sentix_state = {
@@ -107,9 +108,10 @@ async def get_portfolio():
 
 @router.post("/api/portfolio/reset")
 async def reset_portfolio():
-    sentix_state["portfolio"] = {"balanceUSD": 100000.0, "assets": {}, "initialBalance": 100000.0}
-    sentix_state["trades"] = []
-    _save_sentix_db()
+    async with sentix_state_lock:
+        sentix_state["portfolio"] = {"balanceUSD": 100000.0, "assets": {}, "initialBalance": 100000.0}
+        sentix_state["trades"] = []
+        _save_sentix_db()
     return {"success": True, "message": "Portofolio direset berhasil."}
 
 
@@ -160,10 +162,12 @@ async def execute_trade(request: Request):
         "status": "OPEN", "timestamp": int(time.time() * 1000),
         "exitTimestamp": None, "reason": None
     }
-    sentix_state["trades"].append(trade)
-    sentix_state["portfolio"]["balanceUSD"] = round(sentix_state["portfolio"]["balanceUSD"] - margin, 2)
-    _save_sentix_db()
-    return {"success": True, "message": "Order berhasil dieksekusi.", "trades": sentix_state["trades"]}
+    
+    async with sentix_state_lock:
+        sentix_state["trades"].append(trade)
+        sentix_state["portfolio"]["balanceUSD"] = round(sentix_state["portfolio"]["balanceUSD"] - margin, 2)
+        _save_sentix_db()
+        return {"success": True, "message": "Order berhasil dieksekusi.", "trades": sentix_state["trades"]}
 
 async def close_active_position(trade_id: str, exit_price: float = None) -> Dict[str, Any]:
     """
@@ -171,30 +175,31 @@ async def close_active_position(trade_id: str, exit_price: float = None) -> Dict
     and database.json, updating portfolio balances, calculating PnL, and saving databases.
     """
     
-    trade = next((t for t in sentix_state["trades"] if t["id"] == trade_id and t["status"] == "OPEN"), None)
-    if not trade:
-        return {"success": False, "message": "Transaksi aktif tidak ditemukan di Sentix."}
+    async with sentix_state_lock:
+        trade = next((t for t in sentix_state["trades"] if t["id"] == trade_id and t["status"] == "OPEN"), None)
+        if not trade:
+            return {"success": False, "message": "Transaksi aktif tidak ditemukan di Sentix."}
 
-    prices = _get_current_prices()
-    live_price = exit_price or prices.get(trade["symbol"], trade["entryPrice"])
-    
-    trade["status"] = "CLOSED"
-    trade["exitPrice"] = live_price
-    trade["exitTimestamp"] = int(time.time() * 1000)
-    trade["reason"] = "MANUAL"
-    
-    price_diff = (live_price - trade["entryPrice"]) if trade["type"] == "BUY" else (trade["entryPrice"] - live_price)
-    raw_return = price_diff / trade["entryPrice"]
-    fee = trade["size"] * trade["entryPrice"] * 0.001
-    gross_pnl = raw_return * (trade["size"] * trade["entryPrice"])
-    net_pnl = gross_pnl - fee
-    trade["pnl"] = round(net_pnl, 2)
-    
-    margin_used = (trade["size"] * trade["entryPrice"]) / trade["leverage"]
-    refund = margin_used + net_pnl
-    sentix_state["portfolio"]["balanceUSD"] = round(sentix_state["portfolio"]["balanceUSD"] + refund, 2)
-    
-    _save_sentix_db()
+        prices = _get_current_prices()
+        live_price = exit_price or prices.get(trade["symbol"], trade["entryPrice"])
+        
+        trade["status"] = "CLOSED"
+        trade["exitPrice"] = live_price
+        trade["exitTimestamp"] = int(time.time() * 1000)
+        trade["reason"] = "MANUAL"
+        
+        price_diff = (live_price - trade["entryPrice"]) if trade["type"] == "BUY" else (trade["entryPrice"] - live_price)
+        raw_return = price_diff / trade["entryPrice"]
+        fee = trade["size"] * trade["entryPrice"] * 0.001
+        gross_pnl = raw_return * (trade["size"] * trade["entryPrice"])
+        net_pnl = gross_pnl - fee
+        trade["pnl"] = round(net_pnl, 2)
+        
+        margin_used = (trade["size"] * trade["entryPrice"]) / trade["leverage"]
+        refund = margin_used + net_pnl
+        sentix_state["portfolio"]["balanceUSD"] = round(sentix_state["portfolio"]["balanceUSD"] + refund, 2)
+        
+        _save_sentix_db()
     
     # Try to close matching trade in database.json
     try:
@@ -297,17 +302,29 @@ async def close_trade(request: Request):
 async def get_news():
     try:
         from backend.services.market import assets
-        from backend.services.news import news_feed
+        from backend.services.news import news_feed, analyze_sentiment
         sentix_news = []
         for item in news_feed[:30]:
+            # Calculate actual sentiment from headline using AFINN analyzer
+            headline = item.get("headline", "")
+            sent_result = analyze_sentiment(headline)
+            raw_score = sent_result["score"]
+            # Normalize AFINN raw score to -1..+1 range (AFINN max per word ~4, typical headline ~10-20 words)
+            normalized = max(-1.0, min(1.0, raw_score / 40.0))
+            if normalized > 0.1:
+                sent_label = "BULLISH"
+            elif normalized < -0.1:
+                sent_label = "BEARISH"
+            else:
+                sent_label = "NEUTRAL"
             sentix_news.append({
                 "id": item.get("id", f"news-{int(time.time()*1000)}"),
-                "title": item.get("headline", ""),
+                "title": headline,
                 "source": item.get("source", "Unknown"),
                 "url": "", "content": "",
                 "summary": item.get("details", ""),
-                "sentimentScore": 0,
-                "sentimentLabel": "NEUTRAL",
+                "sentimentScore": round(normalized, 4),
+                "sentimentLabel": sent_label,
                 "impactFactor": item.get("impact", "NEUTRAL"),
                 "timestamp": int(time.time() * 1000)
             })
@@ -456,19 +473,26 @@ async def get_llm_settings():
     # Map from AI-Trading-App config to Sentix LLM format
     try:
         config = await load_ai_config()
-        return {"success": True, "settings": {
-            "provider": config.get("provider", "simulated"),
-            "apiKey": config.get("customKey", ""),
-            "baseUrl": config.get("customUrl", ""),
-            "modelName": config.get("customModel", "")
-        }}
-    except Exception:
-        return {"success": True, "settings": sentix_state["llmSettings"]}
+        if config and config.get("provider") and config.get("provider") != "simulated":
+            # Persist valid config from database into sentix_state for cross-session consistency
+            async with sentix_state_lock:
+                sentix_state["llmSettings"].update({
+                    "provider": config.get("provider", "simulated"),
+                    "apiKey": config.get("customKey", ""),
+                    "baseUrl": config.get("customUrl", ""),
+                    "modelName": config.get("customModel", "")
+                })
+            return {"success": True, "settings": sentix_state["llmSettings"]}
+    except Exception as e:
+        logger.error(f"[LLM Settings] Gagal membaca dari database, fallback ke memory state: {e}")
+    # Fallback: return in-memory state (last saved value persists during session)
+    return {"success": True, "settings": sentix_state["llmSettings"]}
 
 @router.post("/api/llm/settings")
 async def save_llm_settings(request: Request):
     body = await request.json()
-    sentix_state["llmSettings"].update(body)
+    async with sentix_state_lock:
+        sentix_state["llmSettings"].update(body)
     # Also save to AI-Trading-App config for the mature pipeline
     try:
         await save_ai_config({
@@ -477,8 +501,9 @@ async def save_llm_settings(request: Request):
             "customKey": body.get("apiKey", ""),
             "customModel": body.get("modelName", ""),
         })
-    except Exception:
-        pass
+        logger.info("[LLM Settings] Konfigurasi LLM berhasil disimpan ke database.")
+    except Exception as e:
+        logger.error(f"[LLM Settings] Gagal menyimpan konfigurasi LLM ke database: {e}")
     _save_sentix_db()
     return {"success": True}
 

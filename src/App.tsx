@@ -317,6 +317,21 @@ export default function App() {
     return data.report;
   };
 
+  // Handler: ML Dataset Download
+  const handleDownloadData = async (params: { symbol: string; startDate: string; endDate: string }) => {
+    const response = await fetch("/api/ml/download", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(params),
+    });
+    if (!response.ok) {
+      const data = await response.json();
+      throw new Error(data.message || data.detail || "Gagal mengunduh dataset.");
+    }
+    const resData = await response.json();
+    return resData;
+  };
+
 // Handler: Local Machine Learning Training
   const handleTrainLocalMLModel = async (params: {
     learningRate: number;
@@ -382,6 +397,16 @@ export default function App() {
     });
     if (response.ok) {
       fetchBackendState();
+      // Refresh LLM settings from backend to persist across sessions
+      try {
+        const llmRes = await fetch("/api/llm/settings");
+        if (llmRes.ok) {
+          const llmData = await llmRes.json();
+          if (llmData.settings) setLlmSettings(llmData.settings);
+        }
+      } catch (e) {
+        console.error("Gagal refresh LLM settings setelah save:", e);
+      }
       return true;
     }
     return false;
@@ -767,6 +792,7 @@ export default function App() {
               <MLPanel
                 onTrainModel={handleTrainLocalMLModel}
                 onGetForecast={handleRequestAIForecast}
+                onDownloadData={handleDownloadData}
                 savedModels={mlModels}
               />
             </div>

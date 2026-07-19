@@ -17,10 +17,11 @@ interface MLPanelProps {
     macd: { line: number; signal: number; histogram: number };
     sentimentScore: number;
   }) => Promise<{ signal: string; priceTargetUSD: number; stopLossUSD: number; reasoning: string }>;
+  onDownloadData: (params: { symbol: string; startDate: string; endDate: string }) => Promise<any>;
   savedModels: MLModel[];
 }
 
-export function MLPanel({ onTrainModel, onGetForecast, savedModels }: MLPanelProps) {
+export function MLPanel({ onTrainModel, onGetForecast, onDownloadData, savedModels }: MLPanelProps) {
   // ML Local Training Form
   const [learningRate, setLearningRate] = useState(0.01);
   const [epochs, setEpochs] = useState(100);
@@ -50,6 +51,13 @@ export function MLPanel({ onTrainModel, onGetForecast, savedModels }: MLPanelPro
     stopLossUSD: number;
     reasoning: string;
   } | null>(null);
+
+  // Dataset Downloader Form
+  const [dlSymbol, setDlSymbol] = useState("ALL");
+  const [dlStartDate, setDlStartDate] = useState(new Date(new Date().setFullYear(new Date().getFullYear() - 1)).toISOString().split('T')[0]);
+  const [dlEndDate, setDlEndDate] = useState(new Date().toISOString().split('T')[0]);
+  const [isDownloading, setIsDownloading] = useState(false);
+  const [dlResult, setDlResult] = useState<any>(null);
 
   const toggleFeature = (feat: string) => {
     if (selectedFeatures.includes(feat)) {
@@ -131,6 +139,20 @@ const handleGetAIForecast = async () => {
       alert(err.message || "Gagal mendapatkan analisis dari AI.");
     } finally {
       setIsConsultingAI(false);
+    }
+  };
+
+  const handleDownloadSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setIsDownloading(true);
+    setDlResult(null);
+    try {
+      const res = await onDownloadData({ symbol: dlSymbol, startDate: dlStartDate, endDate: dlEndDate });
+      setDlResult({ success: true, message: res.message || "Data berhasil diunduh dan diupdate." });
+    } catch (err: any) {
+      setDlResult({ success: false, message: err.message || "Gagal mengunduh data." });
+    } finally {
+      setIsDownloading(false);
     }
   };
 
@@ -433,6 +455,78 @@ const handleGetAIForecast = async () => {
             {isConsultingAI ? "Berkonsultasi..." : "Minta Rekomendasi AI"}
           </button>
         </div>
+      </div>
+
+      {/* Dataset Downloader Section */}
+      <div className="bg-slate-900/60 backdrop-blur-md border border-slate-800/80 rounded-2xl p-6 shadow-2xl">
+        <h4 className="font-sans font-bold text-white text-base mb-4 flex items-center gap-2">
+          Manajemen Dataset Historis (.feather)
+        </h4>
+        <form onSubmit={handleDownloadSubmit} className="space-y-4 text-xs">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div className="space-y-1">
+              <label className="text-slate-400 font-mono">PILIH KOIN</label>
+              <select
+                value={dlSymbol}
+                onChange={(e) => setDlSymbol(e.target.value)}
+                className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-slate-200 outline-none"
+              >
+                <option value="ALL">SEMUA KOIN (Batch)</option>
+                <option value="BTCUSDT">BTCUSDT</option>
+                <option value="ETHUSDT">ETHUSDT</option>
+                <option value="SOLUSDT">SOLUSDT</option>
+                <option value="BNBUSDT">BNBUSDT</option>
+                <option value="XRPUSDT">XRPUSDT</option>
+                <option value="ADAUSDT">ADAUSDT</option>
+                <option value="DOGEUSDT">DOGEUSDT</option>
+                <option value="DOTUSDT">DOTUSDT</option>
+                <option value="SHIBUSDT">SHIBUSDT</option>
+                <option value="LTCUSDT">LTCUSDT</option>
+                <option value="LINKUSDT">LINKUSDT</option>
+                <option value="NEARUSDT">NEARUSDT</option>
+                <option value="SUIUSDT">SUIUSDT</option>
+              </select>
+            </div>
+            <div className="space-y-1">
+              <label className="text-slate-400 font-mono">TANGGAL MULAI</label>
+              <input
+                type="date"
+                value={dlStartDate}
+                onChange={(e) => setDlStartDate(e.target.value)}
+                className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-slate-200 outline-none"
+              />
+            </div>
+            <div className="space-y-1">
+              <label className="text-slate-400 font-mono">TANGGAL AKHIR</label>
+              <input
+                type="date"
+                value={dlEndDate}
+                onChange={(e) => setDlEndDate(e.target.value)}
+                className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-slate-200 outline-none"
+              />
+            </div>
+          </div>
+          <button
+            type="submit"
+            disabled={isDownloading}
+            className="w-full bg-emerald-600 hover:bg-emerald-500 text-white font-bold py-2.5 px-4 rounded-xl flex items-center justify-center gap-2 active:scale-95 disabled:opacity-50 transition cursor-pointer"
+          >
+            {isDownloading ? (
+              <>
+                <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
+                Mengunduh & Memperbarui...
+              </>
+            ) : (
+              "Download & Update Dataset (.feather)"
+            )}
+          </button>
+          
+          {dlResult && (
+            <div className={`mt-2 p-3 rounded-lg border text-xs font-mono ${dlResult.success ? 'bg-emerald-900/20 border-emerald-800 text-emerald-400' : 'bg-red-900/20 border-red-800 text-red-400'}`}>
+              {dlResult.message}
+            </div>
+          )}
+        </form>
       </div>
 
       {/* Historical List Models Trained */}
