@@ -361,6 +361,14 @@ async def get_ai_bot_settings(response: Response):
 async def save_ai_bot_settings(request: Request):
     body = await request.json()
     async with sentix_state_lock:
+        was_enabled = sentix_state["aiBotSettings"].get("enabled", False)
+        if "enabled" in body:
+            is_enabled = body["enabled"]
+            if is_enabled and not was_enabled:
+                body["activatedAt"] = int(time.time() * 1000)
+            elif not is_enabled and was_enabled:
+                body["activatedAt"] = 0
+                
         sentix_state["aiBotSettings"].update(body)
         _save_sentix_db()
     return {"success": True, "message": "Konfigurasi AI Bot berhasil disimpan."}
