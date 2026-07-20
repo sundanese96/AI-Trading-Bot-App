@@ -1,6 +1,6 @@
 {
   "forexfactory": {
-    "timestamp": 1784517569.5073085,
+    "timestamp": 1784522949.6473541,
     "data": [
       {
         "title": "FF CALENDAR: GBP - Claimant Count Change (High Impact)",
@@ -103,11 +103,11 @@
     ]
   },
   "reuters": {
-    "timestamp": 1784517570.3314898,
+    "timestamp": 1784522949.733294,
     "data": []
   },
   "bbc": {
-    "timestamp": 1784517569.6964707,
+    "timestamp": 1784522949.3625693,
     "data": [
       {
         "title": "Spain beat Argentina to win World Cup for second time",
@@ -120,13 +120,8 @@
         "source": "BBC Scraper"
       },
       {
-        "title": "Russia launches major ballistic missile attack on Ukrainian cities",
-        "url": "https://www.bbc.com/news/articles/c2el7xpnzrpo",
-        "source": "BBC Scraper"
-      },
-      {
-        "title": "Neighbours actor Terence Donovan dies aged 90",
-        "url": "https://www.bbc.com/news/articles/crmrznw82j4o",
+        "title": "\u2018Everyone's afraid to die\u2019: Struggle to recruit soldiers in Ukraine turns violent",
+        "url": "https://www.bbc.com/news/articles/cr7k5ngde3vo",
         "source": "BBC Scraper"
       },
       {
@@ -135,24 +130,29 @@
         "source": "BBC Scraper"
       },
       {
-        "title": "\u2018Everyone's afraid to die\u2019: Struggle to recruit soldiers in Ukraine turns violent",
-        "url": "https://www.bbc.com/news/articles/cr7k5ngde3vo",
+        "title": "Andy Burnham to become PM as Keir Starmer prepares to leave No 10",
+        "url": "https://www.bbc.com/news/live/cgrkv8e8l9qt",
         "source": "BBC Scraper"
       },
       {
-        "title": "India's Cockroach protesters set to march to parliament",
+        "title": "Chris Mason: Burnham is fifth PM in four years - now he'll try to buck the trend",
+        "url": "https://www.bbc.com/news/articles/cr7knml2y99o",
+        "source": "BBC Scraper"
+      },
+      {
+        "title": "Food delivery rider wins China's top literary prize",
+        "url": "https://www.bbc.com/news/articles/c5ydr3xd0kvo",
+        "source": "BBC Scraper"
+      },
+      {
+        "title": "India's cockroach protesters set to march to parliament",
         "url": "https://www.bbc.com/news/articles/c0l58lw089no",
-        "source": "BBC Scraper"
-      },
-      {
-        "title": "Tate brothers arrested in US as further UK charges take total to 59",
-        "url": "https://www.bbc.com/news/articles/cwymly9yd33o",
         "source": "BBC Scraper"
       }
     ]
   },
   "cryptopanic": {
-    "timestamp": 1784517569.9723985,
+    "timestamp": 1784522949.8279963,
     "data": []
   }
 }

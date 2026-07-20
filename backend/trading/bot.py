@@ -36,6 +36,13 @@ async def _evaluate_llm_trade_signal(headline, item, config, bot_settings):
     decision = trade_decision.get("decision", "HOLD")
     confidence = trade_decision.get("confidence", 0)
     
+    # Perbaikan untuk LLM Lokal yang gagal memberikan reasoning pada fallback sideways
+    if not trade_decision.get("strategyReasoning"):
+        if "sideways" in headline.lower():
+            trade_decision["strategyReasoning"] = "Pasar kripto sedang sideways tanpa katalis berita signifikan. Bot menggunakan indikator murni."
+        else:
+            trade_decision["strategyReasoning"] = "LLM tidak menyertakan alasan spesifik. Mengikuti indikator teknikal."
+    
     correlation_log = ""
     if active_asset != "BTC":
         hist_target = []

@@ -863,7 +863,7 @@ def run_backtest_simulation(params: dict):
     try:
         # Fetch up to 300 historical candles
         url = f"https://api.binance.com/api/v3/klines?symbol={symbol}&interval={interval}&limit=300"
-        with httpx.Client() as client:
+        with httpx.Client(verify=False) as client:
             resp = client.get(url, timeout=5.0)
             if resp.status_code == 200:
                 klines = resp.json()
@@ -972,6 +972,42 @@ def run_backtest_simulation(params: dict):
             if bb_lower[i] is not None and bb_upper[i] is not None:
                 buy_signal = close_p < bb_lower[i]
                 sell_signal = close_p > bb_upper[i]
+
+        elif strategy == "CONSERVATIVE":
+            # Multi-confirmation: MACD > 0 AND RSI < 45 AND Price > SMA(Long)
+            if macd_hist[i] is not None and rsi[i] is not None and sma_long[i] is not None:
+                buy_signal = macd_hist[i] > 0 and rsi[i] < 45 and close_p > sma_long[i]
+                sell_signal = macd_hist[i] < 0 and rsi[i] > 55 and close_p < sma_long[i]
+
+        elif strategy == "SCALPING":
+            # Fast momentum: RSI crossover 50 + SMA Short direction
+            if rsi[i] is not None and rsi[i-1] is not None and sma_short[i] is not None:
+                buy_signal = rsi[i] > 50 and rsi[i-1] <= 50 and close_p > sma_short[i]
+                sell_signal = rsi[i] < 50 and rsi[i-1] >= 50 and close_p < sma_short[i]
+
+        elif strategy == "SWING":
+            # Long term trend: SMA cross with MACD confirmation
+            if sma_short[i] is not None and sma_long[i] is not None and macd_hist[i] is not None:
+                buy_signal = sma_short[i] > sma_long[i] and macd_hist[i] > 0
+                sell_signal = sma_short[i] < sma_long[i] and macd_hist[i] < 0
+
+        elif strategy == "AGGRESSIVE":
+            # High frequency pullbacks without waiting for full confirmation
+            if rsi[i] is not None:
+                buy_signal = rsi[i] < 40
+                sell_signal = rsi[i] > 60
+
+        elif strategy == "MARTINGALE":
+            # Approximated by frequent reversals upon BB touches and RSI extremes
+            if bb_lower[i] is not None and bb_upper[i] is not None and rsi[i] is not None:
+                buy_signal = close_p < bb_lower[i] or rsi[i] < 30
+                sell_signal = close_p > bb_upper[i] or rsi[i] > 70
+                
+        elif strategy == "HEDGING":
+            # Frequent alternation based on MACD Line vs Signal crossovers
+            if macd_line[i] is not None and macd_signal[i] is not None and macd_line[i-1] is not None:
+                buy_signal = macd_line[i] > macd_signal[i] and macd_line[i-1] <= macd_signal[i-1]
+                sell_signal = macd_line[i] < macd_signal[i] and macd_line[i-1] >= macd_signal[i-1]
 
         # Process open position first
         if position:

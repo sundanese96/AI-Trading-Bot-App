@@ -73,160 +73,200 @@ export function BacktestPanel({ onRunBacktest }: BacktestPanelProps) {
             Parameter Backtester
           </h3>
 
-          <form onSubmit={handleExecute} className="space-y-4 text-xs">
-            {/* Symbol */}
-            <div className="space-y-1.5">
-              <label className="text-slate-400 font-mono">ASET KRIPTO</label>
-              <select
-                value={symbol}
-                onChange={(e) => setSymbol(e.target.value)}
-                className="w-full bg-slate-950 border border-slate-800 focus:border-indigo-500 rounded-xl px-3.5 py-2.5 text-slate-200 outline-none"
-              >
-                <option value="BTCUSDT">BTC/USDT</option>
-                <option value="ETHUSDT">ETH/USDT</option>
-                <option value="SOLUSDT">SOL/USDT</option>
-                <option value="BNBUSDT">BNB/USDT</option>
-                <option value="XRPUSDT">XRP/USDT</option>
-                <option value="ADAUSDT">ADA/USDT</option>
-                <option value="DOGEUSDT">DOGE/USDT</option>
-                <option value="DOTUSDT">DOT/USDT</option>
-                <option value="SHIBUSDT">SHIB/USDT</option>
-                <option value="LTCUSDT">LTC/USDT</option>
-                <option value="LINKUSDT">LINK/USDT</option>
-                <option value="NEARUSDT">NEAR/USDT</option>
-                <option value="SUIUSDT">SUI/USDT</option>
-              </select>
+          <form onSubmit={handleExecute} className="space-y-6 text-xs text-slate-300">
+            {/* Target & Strategy Grid */}
+            <div className="bg-slate-950/40 p-4 rounded-xl border border-slate-850 space-y-4">
+              <span className="font-mono text-slate-200 font-bold flex items-center gap-1.5 border-b border-slate-850 pb-2">
+                <BarChart4 className="h-4 w-4 text-indigo-400" />
+                TARGET & STRATEGI SIMULASI
+              </span>
+              
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div className="space-y-1.5">
+                  <label className="text-slate-400 font-mono text-[10px]">ASET KRIPTO</label>
+                  <select
+                    value={symbol}
+                    onChange={(e) => setSymbol(e.target.value)}
+                    className="w-full bg-slate-950 border border-slate-800 focus:border-indigo-500 rounded-xl px-3 py-2.5 outline-none font-mono font-bold text-white"
+                  >
+                    <option value="BTCUSDT">BTC/USDT</option>
+                    <option value="ETHUSDT">ETH/USDT</option>
+                    <option value="SOLUSDT">SOL/USDT</option>
+                    <option value="BNBUSDT">BNB/USDT</option>
+                    <option value="XRPUSDT">XRP/USDT</option>
+                    <option value="ADAUSDT">ADA/USDT</option>
+                    <option value="DOGEUSDT">DOGE/USDT</option>
+                    <option value="DOTUSDT">DOT/USDT</option>
+                    <option value="SHIBUSDT">SHIB/USDT</option>
+                    <option value="LTCUSDT">LTC/USDT</option>
+                    <option value="LINKUSDT">LINK/USDT</option>
+                    <option value="NEARUSDT">NEAR/USDT</option>
+                    <option value="SUIUSDT">SUI/USDT</option>
+                  </select>
+                </div>
+                
+                <div className="space-y-1.5">
+                  <label className="text-slate-400 font-mono text-[10px]">STRATEGI FORMULA</label>
+                  <select
+                    value={strategy}
+                    onChange={(e) => setStrategy(e.target.value as any)}
+                    className="w-full bg-slate-950 border border-slate-800 focus:border-indigo-500 rounded-xl px-3 py-2.5 outline-none font-sans font-bold text-white text-xs"
+                  >
+                    <option disabled className="text-slate-500 bg-slate-900">--- Indikator Teknikal Murni ---</option>
+                    <option value="SMA_CROSS">SMA Crossover (Golden/Death Cross)</option>
+                    <option value="RSI_REVERSAL">RSI Reversal (Oversold/Overbought)</option>
+                    <option value="MACD_CROSS">MACD Line/Signal Crossover</option>
+                    <option value="BOLLINGER_REVERSION">Bollinger Bands Mean Reversion</option>
+                    <option disabled className="text-slate-500 bg-slate-900 mt-2">--- AI Bot Equivalents ---</option>
+                    <option value="CONSERVATIVE">🛡️ CONSERVATIVE (Hati-Hati)</option>
+                    <option value="SCALPING">⚡ SCALPING (Cepat)</option>
+                    <option value="SWING">📈 SWING (Tren Jangka Panjang)</option>
+                    <option value="AGGRESSIVE">🔥 AGGRESSIVE (Agresif & Sensitif)</option>
+                    <option value="MARTINGALE">🔄 MARTINGALE (Averaging Down)</option>
+                    <option value="HEDGING">🔒 HEDGING (Posisi Dua Arah)</option>
+                  </select>
+                </div>
+              </div>
             </div>
 
-            {/* Strategy */}
-            <div className="space-y-1.5">
-              <label className="text-slate-400 font-mono">STRATEGI FORMULA</label>
-              <select
-                value={strategy}
-                onChange={(e) => setStrategy(e.target.value as any)}
-                className="w-full bg-slate-950 border border-slate-800 focus:border-indigo-500 rounded-xl px-3.5 py-2.5 text-slate-200 outline-none"
-              >
-                <option value="SMA_CROSS">SMA Crossover (Golden/Death Cross)</option>
-                <option value="RSI_REVERSAL">RSI Reversal (Oversold/Overbought)</option>
-                <option value="MACD_CROSS">MACD Line/Signal Crossover</option>
-                <option value="BOLLINGER_REVERSION">Bollinger Bands Mean Reversion</option>
-              </select>
+            {/* Financial & Risk Parameters */}
+            <div className="bg-slate-950/40 p-4 rounded-xl border border-slate-850 space-y-4">
+              <span className="font-mono text-slate-200 font-bold flex items-center gap-1.5 border-b border-slate-850 pb-2">
+                <ShieldAlert className="h-4 w-4 text-rose-400" />
+                MANAJEMEN KEUANGAN & RISIKO
+              </span>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div className="space-y-1.5">
+                  <label className="text-slate-400 font-mono text-[10px]">SALDO AWAL (USD)</label>
+                  <div className="flex items-center gap-2">
+                    <input
+                      type="number"
+                      value={startingBalance}
+                      onChange={(e) => setStartingBalance(Math.max(100, parseInt(e.target.value) || 0))}
+                      className="w-full bg-slate-950 border border-slate-800 focus:border-indigo-500 rounded-xl px-3 py-2.5 outline-none font-mono text-white"
+                    />
+                    <span className="text-slate-500 font-mono text-xs">USDT</span>
+                  </div>
+                </div>
+                
+                <div className="space-y-1.5">
+                  <label className="text-slate-400 font-mono text-[10px]">LEVERAGE (DAYA UNGKIT)</label>
+                  <div className="flex items-center gap-2">
+                    <input
+                      type="number"
+                      min="1"
+                      max="125"
+                      value={leverage}
+                      onChange={(e) => setLeverage(parseInt(e.target.value))}
+                      className="w-full bg-slate-950 border border-slate-800 focus:border-indigo-500 rounded-xl px-3 py-2.5 outline-none font-mono text-white"
+                    />
+                    <span className="text-slate-400 font-mono text-xs">x</span>
+                  </div>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div className="space-y-1.5">
+                  <label className="text-slate-400 font-mono text-[10px]">STOP LOSS (%)</label>
+                  <div className="flex items-center gap-2">
+                    <input
+                      type="number"
+                      step="0.1"
+                      value={stopLossPct}
+                      onChange={(e) => setStopLossPct(Math.max(0, parseFloat(e.target.value) || 0))}
+                      className="w-full bg-slate-950 border border-slate-800 focus:border-indigo-500 rounded-xl px-3 py-2.5 outline-none font-mono text-white"
+                    />
+                    <span className="text-slate-500 font-mono text-xs">%</span>
+                  </div>
+                </div>
+                
+                <div className="space-y-1.5">
+                  <label className="text-slate-400 font-mono text-[10px]">TAKE PROFIT (%)</label>
+                  <div className="flex items-center gap-2">
+                    <input
+                      type="number"
+                      step="0.1"
+                      value={takeProfitPct}
+                      onChange={(e) => setTakeProfitPct(Math.max(0, parseFloat(e.target.value) || 0))}
+                      className="w-full bg-slate-950 border border-slate-800 focus:border-indigo-500 rounded-xl px-3 py-2.5 outline-none font-mono text-white"
+                    />
+                    <span className="text-slate-500 font-mono text-xs">%</span>
+                  </div>
+                </div>
+              </div>
             </div>
 
-            {/* Interval & Starting Balance */}
-            <div className="grid grid-cols-2 gap-3">
+            {/* Technical Strategy Parameters */}
+            <div className="bg-slate-950/40 p-4 rounded-xl border border-slate-850 space-y-4">
+              <span className="font-mono text-slate-200 font-bold flex items-center gap-1.5 border-b border-slate-850 pb-2">
+                <TrendingUp className="h-4 w-4 text-emerald-400" />
+                PARAMETER INDIKATOR TEKNIKAL
+              </span>
+
               <div className="space-y-1.5">
-                <label className="text-slate-400 font-mono">INTERVAL</label>
+                <label className="text-slate-400 font-mono text-[10px]">TIMEFRAME INTERVAL</label>
                 <select
                   value={interval}
                   onChange={(e) => setIntervalVal(e.target.value as any)}
-                  className="w-full bg-slate-950 border border-slate-800 focus:border-indigo-500 rounded-xl px-3 py-2.5 text-slate-200 outline-none"
+                  className="w-full bg-slate-950 border border-slate-800 focus:border-emerald-500 rounded-xl px-3 py-2.5 outline-none font-sans font-bold text-white text-sm"
                 >
-                  <option value="1h">1 Jam (Hourly)</option>
-                  <option value="1d">1 Hari (Daily)</option>
+                  <option value="1h">1 Jam (Hourly - Standar Day Trading)</option>
+                  <option value="1d">1 Hari (Daily - Standar Swing Trading)</option>
                 </select>
               </div>
-              <div className="space-y-1.5">
-                <label className="text-slate-400 font-mono">SALDO AWAL (USD)</label>
-                <input
-                  type="number"
-                  value={startingBalance}
-                  onChange={(e) => setStartingBalance(Math.max(100, parseInt(e.target.value) || 0))}
-                  className="w-full bg-slate-950 border border-slate-800 focus:border-indigo-500 rounded-xl px-3 py-2.5 text-slate-200 outline-none font-mono"
-                />
-              </div>
+
+              {strategy === "SMA_CROSS" && (
+                <div className="grid grid-cols-2 gap-4 border-t border-slate-850/50 pt-3">
+                  <div className="space-y-1.5">
+                    <label className="text-amber-500 font-mono text-[10px]">SMA SHORT PERIOD</label>
+                    <input
+                      type="number"
+                      value={smaShort}
+                      onChange={(e) => setSmaShort(Math.max(2, parseInt(e.target.value) || 10))}
+                      className="w-full bg-slate-950 border border-slate-800 focus:border-amber-500 rounded-xl px-3 py-2.5 text-white outline-none font-mono"
+                    />
+                  </div>
+                  <div className="space-y-1.5">
+                    <label className="text-amber-500 font-mono text-[10px]">SMA LONG PERIOD</label>
+                    <input
+                      type="number"
+                      value={smaLong}
+                      onChange={(e) => setSmaLong(Math.max(5, parseInt(e.target.value) || 30))}
+                      className="w-full bg-slate-950 border border-slate-800 focus:border-amber-500 rounded-xl px-3 py-2.5 text-white outline-none font-mono"
+                    />
+                  </div>
+                </div>
+              )}
+
+              {strategy === "RSI_REVERSAL" && (
+                <div className="grid grid-cols-2 gap-4 border-t border-slate-850/50 pt-3">
+                  <div className="space-y-1.5">
+                    <label className="text-cyan-400 font-mono text-[10px]">RSI OVERSOLD</label>
+                    <input
+                      type="number"
+                      value={rsiOversold}
+                      onChange={(e) => setRsiOversold(Math.max(5, parseInt(e.target.value) || 30))}
+                      className="w-full bg-slate-950 border border-slate-800 focus:border-cyan-500 rounded-xl px-3 py-2.5 text-white outline-none font-mono"
+                    />
+                  </div>
+                  <div className="space-y-1.5">
+                    <label className="text-cyan-400 font-mono text-[10px]">RSI OVERBOUGHT</label>
+                    <input
+                      type="number"
+                      value={rsiOverbought}
+                      onChange={(e) => setRsiOverbought(Math.max(50, parseInt(e.target.value) || 70))}
+                      className="w-full bg-slate-950 border border-slate-800 focus:border-cyan-500 rounded-xl px-3 py-2.5 text-white outline-none font-mono"
+                    />
+                  </div>
+                </div>
+              )}
             </div>
-
-            {/* Leverage Slider */}
-            <div className="space-y-2">
-              <div className="flex justify-between text-[10px] font-mono text-slate-400">
-                <span>LEVERAGE MARGIN</span>
-                <span className="text-indigo-400 font-bold">{leverage}x</span>
-              </div>
-              <input
-                type="range"
-                min="1"
-                max="100"
-                value={leverage}
-                onChange={(e) => setLeverage(parseInt(e.target.value))}
-                className="w-full h-1 bg-slate-850 rounded-lg appearance-none cursor-pointer accent-indigo-500"
-              />
-            </div>
-
-            {/* Stop Loss & Take Profit */}
-            <div className="grid grid-cols-2 gap-3">
-              <div className="space-y-1.5">
-                <label className="text-slate-400 font-mono">STOP LOSS (%)</label>
-                <input
-                  type="number"
-                  step="0.1"
-                  value={stopLossPct}
-                  onChange={(e) => setStopLossPct(Math.max(0, parseFloat(e.target.value) || 0))}
-                  className="w-full bg-slate-950 border border-slate-800 focus:border-indigo-500 rounded-xl px-3 py-2.5 text-slate-200 outline-none font-mono"
-                />
-              </div>
-              <div className="space-y-1.5">
-                <label className="text-slate-400 font-mono">TAKE PROFIT (%)</label>
-                <input
-                  type="number"
-                  step="0.1"
-                  value={takeProfitPct}
-                  onChange={(e) => setTakeProfitPct(Math.max(0, parseFloat(e.target.value) || 0))}
-                  className="w-full bg-slate-950 border border-slate-800 focus:border-indigo-500 rounded-xl px-3 py-2.5 text-slate-200 outline-none font-mono"
-                />
-              </div>
-            </div>
-
-            {/* Strategy specific parameters */}
-            {strategy === "SMA_CROSS" && (
-              <div className="grid grid-cols-2 gap-3 border-t border-slate-800/40 pt-3">
-                <div className="space-y-1.5">
-                  <label className="text-amber-500 font-mono uppercase text-[9px]">SMA Short Period</label>
-                  <input
-                    type="number"
-                    value={smaShort}
-                    onChange={(e) => setSmaShort(Math.max(2, parseInt(e.target.value) || 10))}
-                    className="w-full bg-slate-950 border border-slate-800 focus:border-indigo-500 rounded-xl px-3 py-2 text-slate-200 outline-none font-mono"
-                  />
-                </div>
-                <div className="space-y-1.5">
-                  <label className="text-amber-500 font-mono uppercase text-[9px]">SMA Long Period</label>
-                  <input
-                    type="number"
-                    value={smaLong}
-                    onChange={(e) => setSmaLong(Math.max(5, parseInt(e.target.value) || 30))}
-                    className="w-full bg-slate-950 border border-slate-800 focus:border-indigo-500 rounded-xl px-3 py-2 text-slate-200 outline-none font-mono"
-                  />
-                </div>
-              </div>
-            )}
-
-            {strategy === "RSI_REVERSAL" && (
-              <div className="grid grid-cols-2 gap-3 border-t border-slate-800/40 pt-3">
-                <div className="space-y-1.5">
-                  <label className="text-cyan-400 font-mono uppercase text-[9px]">RSI Oversold</label>
-                  <input
-                    type="number"
-                    value={rsiOversold}
-                    onChange={(e) => setRsiOversold(Math.max(5, parseInt(e.target.value) || 30))}
-                    className="w-full bg-slate-950 border border-slate-800 focus:border-indigo-500 rounded-xl px-3 py-2 text-slate-200 outline-none font-mono"
-                  />
-                </div>
-                <div className="space-y-1.5">
-                  <label className="text-cyan-400 font-mono uppercase text-[9px]">RSI Overbought</label>
-                  <input
-                    type="number"
-                    value={rsiOverbought}
-                    onChange={(e) => setRsiOverbought(Math.max(50, parseInt(e.target.value) || 70))}
-                    className="w-full bg-slate-950 border border-slate-800 focus:border-indigo-500 rounded-xl px-3 py-2 text-slate-200 outline-none font-mono"
-                  />
-                </div>
-              </div>
-            )}
 
             {/* Error Message */}
             {errorMessage && (
-              <div className="p-3 bg-red-950/20 border border-red-900/30 rounded-xl text-red-400 text-[11px] leading-relaxed">
+              <div className="p-3 bg-red-950/20 border border-red-900/30 rounded-xl text-red-400 text-[11px] leading-relaxed flex items-center gap-2">
+                <ShieldAlert className="h-4 w-4 shrink-0" />
                 {errorMessage}
               </div>
             )}
@@ -235,10 +275,10 @@ export function BacktestPanel({ onRunBacktest }: BacktestPanelProps) {
             <button
               type="submit"
               disabled={isLoading}
-              className="w-full bg-gradient-to-r from-indigo-600 to-indigo-700 hover:from-indigo-500 hover:to-indigo-600 active:scale-[0.98] transition font-bold py-3 px-4 rounded-xl text-white flex items-center justify-center gap-2 disabled:opacity-50 font-sans cursor-pointer shadow-lg shadow-indigo-600/10"
+              className="w-full bg-indigo-600 hover:bg-indigo-500 text-white font-bold py-3.5 px-4 rounded-xl flex items-center justify-center gap-2 active:scale-95 disabled:opacity-50 transition cursor-pointer font-sans shadow-lg shadow-indigo-600/10"
             >
-              <Play className={`h-4 w-4 ${isLoading ? "animate-pulse" : ""}`} />
-              {isLoading ? "Mengunduh & Backtesting..." : "Jalankan Backtest"}
+              <Play className={`h-4.5 w-4.5 ${isLoading ? "animate-pulse" : ""}`} />
+              {isLoading ? "Mengunduh & Backtesting..." : "Jalankan Backtest Simulasi"}
             </button>
           </form>
         </div>
