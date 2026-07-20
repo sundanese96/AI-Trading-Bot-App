@@ -121,11 +121,17 @@ async def ai_bot_automated_loop():
                     source = "System Indicator"
                     
                     if news_feed:
-                        headline = news_feed[0].get("headline", headline)
-                        source = news_feed[0].get("source", source)
+                        latest_headline = news_feed[0].get("headline", headline)
+                        from backend.helpers.utils import is_headline_processed
+                        # Jika berita terakhir belum diproses, gunakan berita tersebut.
+                        # Jika sudah, kita fallback ke "sideways" agar bot tetap melakukan periodic check.
+                        if not is_headline_processed(latest_headline):
+                            headline = latest_headline
+                            source = news_feed[0].get("source", source)
                     
                     current_key = f"{headline}-{symbol}-{strategy}"
-                    if current_key == last_evaluated_key:
+                    # Skip jika berita asli (bukan sideways) sudah dievaluasi sebelumnya (mencegah spam)
+                    if current_key == last_evaluated_key and "sideways" not in headline.lower():
                         await asyncio.sleep(1)
                         continue
                     

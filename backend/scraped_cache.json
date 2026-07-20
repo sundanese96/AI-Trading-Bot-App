@@ -1,6 +1,6 @@
 {
   "forexfactory": {
-    "timestamp": 1784439508.5048084,
+    "timestamp": 1784517569.5073085,
     "data": [
       {
         "title": "FF CALENDAR: GBP - Claimant Count Change (High Impact)",
@@ -103,56 +103,56 @@
     ]
   },
   "reuters": {
-    "timestamp": 1784439508.5146637,
+    "timestamp": 1784517570.3314898,
     "data": []
   },
   "bbc": {
-    "timestamp": 1784439508.607932,
+    "timestamp": 1784517569.6964707,
     "data": [
       {
-        "title": "US and Iran exchange strikes after two US deaths in Jordan attack",
+        "title": "Spain beat Argentina to win World Cup for second time",
+        "url": "https://www.bbc.com/sport/football/live/cgk4ymn3n72t",
+        "source": "BBC Scraper"
+      },
+      {
+        "title": "Moment fans in Madrid celebrate World Cup win",
+        "url": "https://www.bbc.com/news/videos/cgr701xrg14o",
+        "source": "BBC Scraper"
+      },
+      {
+        "title": "Russia launches major ballistic missile attack on Ukrainian cities",
+        "url": "https://www.bbc.com/news/articles/c2el7xpnzrpo",
+        "source": "BBC Scraper"
+      },
+      {
+        "title": "Neighbours actor Terence Donovan dies aged 90",
+        "url": "https://www.bbc.com/news/articles/crmrznw82j4o",
+        "source": "BBC Scraper"
+      },
+      {
+        "title": "US soldier killed and one injured after Iranian attack in Iraq",
         "url": "https://www.bbc.com/news/articles/cgk417jp83po",
         "source": "BBC Scraper"
       },
       {
-        "title": "England beat France 6-4 in thrilling third-place match",
-        "url": "https://www.bbc.com/sport/football/live/cly5lj1nqdxt",
+        "title": "\u2018Everyone's afraid to die\u2019: Struggle to recruit soldiers in Ukraine turns violent",
+        "url": "https://www.bbc.com/news/articles/cr7k5ngde3vo",
         "source": "BBC Scraper"
       },
       {
-        "title": "Andrew Tate and brother arrested in US after more charges laid against them in UK",
+        "title": "India's Cockroach protesters set to march to parliament",
+        "url": "https://www.bbc.com/news/articles/c0l58lw089no",
+        "source": "BBC Scraper"
+      },
+      {
+        "title": "Tate brothers arrested in US as further UK charges take total to 59",
         "url": "https://www.bbc.com/news/articles/cwymly9yd33o",
-        "source": "BBC Scraper"
-      },
-      {
-        "title": "Russians turn to cash, putting more strain on slowing wartime economy",
-        "url": "https://www.bbc.com/news/articles/cglj255jk8ko",
-        "source": "BBC Scraper"
-      },
-      {
-        "title": "Kim Jong Un was meant to be their only idol - then North Koreans discovered K-pop",
-        "url": "https://www.bbc.com/news/articles/c0jygjezvlwo",
-        "source": "BBC Scraper"
-      },
-      {
-        "title": "Indian activist on hunger strike for 20 days forcibly taken to hospital",
-        "url": "https://www.bbc.com/news/articles/cjej3dxxg2do",
-        "source": "BBC Scraper"
-      },
-      {
-        "title": "India's Ganesh idol makers count the cost of devastating floods",
-        "url": "https://www.bbc.com/news/articles/cp8r850e7z1o",
-        "source": "BBC Scraper"
-      },
-      {
-        "title": "Diamonds and 'cab to orbit': Rocket aiming to transform India's space ambitions takes off",
-        "url": "https://www.bbc.com/news/articles/clyekv7rld3o",
         "source": "BBC Scraper"
       }
     ]
   },
   "cryptopanic": {
-    "timestamp": 1784439508.769024,
+    "timestamp": 1784517569.9723985,
     "data": []
   }
 }

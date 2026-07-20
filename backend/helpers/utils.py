@@ -74,3 +74,17 @@ def _calculate_risk_parameters(bot_settings, live_price, decision, strategy):
     sl_price = live_price * (1 - sl_pct / 100) if decision == "LONG" else live_price * (1 + sl_pct / 100)
     tp_price = live_price * (1 + tp_pct / 100) if decision == "LONG" else live_price * (1 - tp_pct / 100)
     return {"lev": lev_val, "margin": margin, "sl_price": sl_price, "tp_price": tp_price, "sl_pct_raw": sl_pct, "tp_pct_raw": tp_pct}
+
+processed_headlines = set()
+
+def mark_headline_processed(headline: str):
+    if headline:
+        processed_headlines.add(headline.strip().lower())
+
+def is_headline_processed(headline: str) -> bool:
+    if not headline:
+        return False
+    normalized = headline.strip().lower()
+    if "sideways yang stabil" in normalized:
+        return False
+    return normalized in processed_headlines

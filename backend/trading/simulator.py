@@ -119,11 +119,18 @@ async def _execute_simulated_trade(headline, target_asset, decision, confidence,
         asyncio.create_task(send_telegram_alert(f"🚀 *Simulated Trade Opened* 🚀\n\n*Asset*: {target_asset}\n*Action*: {decision}\n*Entry Price*: ${live_price}\n*Confidence*: {confidence}%\n*SL*: {risk['sl_pct_raw']}% | *TP*: {risk['tp_pct_raw']}%\n*Reason*: {trade_decision.get('strategyReasoning', '')}"))
 
 
-async def trigger_automated_trade_sim(item: Dict[str, Any], config: Dict[str, Any]):
+async def trigger_automated_trade_sim(item: Dict[str, Any], config: Dict[str, Any], force: bool = False):
     """Trigger simulated trade in paper trading mode."""
     try:
         headline = item["title"]
         source = item.get("source", "Unknown")
+        
+        from backend.helpers.utils import is_headline_processed, mark_headline_processed
+        if not force and is_headline_processed(headline):
+            logger.info(f"[Sim Trading] Headline already processed, skipping: {headline}")
+            return
+            
+        mark_headline_processed(headline)
         
         if not is_headline_relevant(headline, source):
             logger.info(f"[Sim Trading] Skipping LLM for irrelevant headline: {headline}")

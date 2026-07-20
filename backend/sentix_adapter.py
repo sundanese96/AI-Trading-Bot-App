@@ -424,7 +424,7 @@ async def trigger_ai_bot():
     """Trigger a manual AI bot evaluation step using the mature FastAPI pipeline."""
     try:
         from backend.services.news import news_feed
-        from backend.main import trigger_automated_trade_sim
+        from backend.trading.simulator import trigger_automated_trade_sim
         from backend.database import load_ai_config
 
         # Use latest news for analysis if available
@@ -436,9 +436,9 @@ async def trigger_ai_bot():
 
         config = await load_ai_config() or {}
         dummy_item = {"title": headline, "source": source}
-        await trigger_automated_trade_sim(dummy_item, config)
+        await trigger_automated_trade_sim(dummy_item, config, force=True)
 
-        return {"success": True, "message": "Evaluasi manual berhasil dipicu."}
+        return {"success": True, "status": "SIMULATED", "message": "Evaluasi manual berhasil dipicu."}
     except Exception as e:
         return {"success": False, "message": str(e)}
 

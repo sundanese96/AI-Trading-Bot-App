@@ -106,27 +106,68 @@ async def update_real_crypto_prices():
     async with httpx.AsyncClient(verify=VERIFY_SSL) as client:
         for sym in symbols:
             success = False
-            for base_url in base_urls:
-                if success:
-                    break
-                try:
-                    response = await client.get(f"{base_url}/api/v3/ticker/24hr?symbol={sym}USDT", timeout=5.0)
-                    if response.status_code == 200:
-                        data = response.json()
-                        price = float(data.get("lastPrice", 0))
-                        change = float(data.get("priceChangePercent", 0))
+            
+            # 1. Try Gate.io first (provides price & change)
+            try:
+                response = await client.get(f"https://api.gateio.ws/api/v4/spot/tickers?currency_pair={sym}_USDT", timeout=5.0)
+                if response.status_code == 200:
+                    data = response.json()
+                    if isinstance(data, list) and len(data) > 0:
+                        price = float(data[0].get("last", 0))
+                        change = float(data[0].get("change_percentage", 0))
                         if price > 0:
                             real_crypto_prices[sym] = {
                                 "price": price,
                                 "change24h": change
                             }
                             success = True
+                            logger.debug(f"[Gate.io API] Successfully fetched price for {sym}: {price} ({change}%)")
+            except Exception as e:
+                logger.debug(f"[Gate.io API] Failed for {sym}: {e}")
+                
+            # 2. Try Kucoin fallback
+            if not success:
+                try:
+                    response = await client.get(f"https://api.kucoin.com/api/v1/market/orderbook/level1?symbol={sym}-USDT", timeout=5.0)
+                    if response.status_code == 200:
+                        data = response.json()
+                        if data.get("code") == "200000" and "data" in data:
+                            price = float(data["data"].get("price", 0))
+                            prev_change = real_crypto_prices.get(sym, {}).get("change24h", 0.0)
+                            if price > 0:
+                                real_crypto_prices[sym] = {
+                                    "price": price,
+                                    "change24h": prev_change
+                                }
+                                success = True
+                                logger.debug(f"[Kucoin API] Successfully fetched price for {sym}: {price}")
                 except Exception as e:
-                    err_msg = str(e) or type(e).__name__
-                    logger.debug(f"[Binance API] Fallback {base_url} failed for {sym}: {err_msg}")
+                    logger.debug(f"[Kucoin API] Failed for {sym}: {e}")
+                    
+            # 3. Try Binance fallback
+            if not success:
+                for base_url in base_urls:
+                    if success:
+                        break
+                    try:
+                        response = await client.get(f"{base_url}/api/v3/ticker/24hr?symbol={sym}USDT", timeout=5.0)
+                        if response.status_code == 200:
+                            data = response.json()
+                            price = float(data.get("lastPrice", 0))
+                            change = float(data.get("priceChangePercent", 0))
+                            if price > 0:
+                                real_crypto_prices[sym] = {
+                                    "price": price,
+                                    "change24h": change
+                                }
+                                success = True
+                                logger.debug(f"[Binance API] Successfully fetched price for {sym} via {base_url}: {price}")
+                    except Exception as e:
+                        err_msg = str(e) or type(e).__name__
+                        logger.debug(f"[Binance API] Fallback {base_url} failed for {sym}: {err_msg}")
             
             if not success:
-                logger.error(f"[Binance API] All endpoints failed to fetch real price for {sym}")
+                logger.error(f"[Market API] All endpoints (Gate.io, Kucoin, Binance) failed to fetch real price for {sym}")
 
 async def update_fear_and_greed_index():
     global fng_cache
