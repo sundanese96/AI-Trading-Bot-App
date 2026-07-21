@@ -134,7 +134,7 @@ async def ai_bot_automated_loop():
                         # Jika sudah, kita fallback ke "sideways" agar bot tetap melakukan periodic check.
                         if not is_headline_processed(latest_headline):
                             headline = latest_headline
-                            source = news_feed[0].get("source", source)
+                            source = news_feed[0].get("source", "System Indicator")
                     
                     current_key = f"{headline}-{symbol}-{strategy}"
                     # Skip jika berita asli (bukan sideways) sudah dievaluasi sebelumnya (mencegah spam)

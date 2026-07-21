@@ -73,6 +73,12 @@ async def news_scraper_loop():
                     news_feed.insert(0, new_item)
                     if len(news_feed) > 50:
                         news_feed.pop()
+                
+                # Pemicu otomatis evaluasi bot trading untuk berita baru yang relevan
+                if enabled:
+                    from backend.trading.simulator import trigger_automated_trade_sim
+                    # Jalankan evaluasi secara asinkron agar tidak memblokir loop scraper
+                    asyncio.create_task(trigger_automated_trade_sim(item, config))
         except Exception as e:
             logger.error(f"[Scraper] Error in news scraper loop: {e}")
         await asyncio.sleep(180)
