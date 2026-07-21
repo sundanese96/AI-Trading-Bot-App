@@ -46,37 +46,33 @@ async def news_scraper_loop():
                 if live_sim_manager.active:
                     await live_sim_manager.handle_new_news(item)
                 
-                if is_dry_run and not is_locked and enabled:
-                    from backend.trading.simulator import trigger_automated_trade_sim
-                    await trigger_automated_trade_sim(item, config)
-                else:
-                    sentiment_res = analyze_sentiment(headline)
-                    score = sentiment_res["score"]
-                    lower = headline.lower()
-                    geo_keywords = ['attack', 'strike', 'war', 'escalation', 'sanction', 'funeral', 'nuclear', 'serangan', 'perang', 'rudal', 'militer', 'bom', 'sanksi', 'konflik']
-                    is_geo = any(k in lower for k in geo_keywords)
-                    macro_keywords = ['nfp', 'cpi', 'fomc', 'gdp', 'inflation', 'fed', 'interest', 'suku bunga', 'pengangguran', 'inflasi', 'gaji', 'pekerjaan']
-                    is_macro = any(k in lower for k in macro_keywords)
-                    category = "GEOPOLITICS" if is_geo else ("MACRO" if is_macro else "GENERAL")
-                    impact = "CRITICAL" if (is_geo or is_macro) else "NEUTRAL"
-                    new_item = {
-                        "id": f"news-{int(time.time() * 1000)}",
-                        "time": time.strftime("%H:%M:%S"),
-                        "headline": headline,
-                        "category": category,
-                        "impact": impact,
-                        "source": item["source"],
-                        "details": f"Scraped from {item['source']}. Sentiment score: {score}.",
-                        "forecast": item.get("forecast", ""),
-                        "previous": item.get("previous", ""),
-                        "isTriggeredShort": is_geo or is_macro,
-                        "isTriggeredGold": is_geo,
-                        "summaryId": f"Scraped news. Category: {category}. Short signal: {'ACTIVE' if (is_geo or is_macro) else 'INACTIVE'}."
-                    }
-                    async with news_feed_lock:
-                        news_feed.insert(0, new_item)
-                        if len(news_feed) > 50:
-                            news_feed.pop()
+                sentiment_res = analyze_sentiment(headline)
+                score = sentiment_res["score"]
+                lower = headline.lower()
+                geo_keywords = ['attack', 'strike', 'war', 'escalation', 'sanction', 'funeral', 'nuclear', 'serangan', 'perang', 'rudal', 'militer', 'bom', 'sanksi', 'konflik']
+                is_geo = any(k in lower for k in geo_keywords)
+                macro_keywords = ['nfp', 'cpi', 'fomc', 'gdp', 'inflation', 'fed', 'interest', 'suku bunga', 'pengangguran', 'inflasi', 'gaji', 'pekerjaan']
+                is_macro = any(k in lower for k in macro_keywords)
+                category = "GEOPOLITICS" if is_geo else ("MACRO" if is_macro else "GENERAL")
+                impact = "CRITICAL" if (is_geo or is_macro) else "NEUTRAL"
+                new_item = {
+                    "id": f"news-{int(time.time() * 1000)}",
+                    "time": time.strftime("%H:%M:%S"),
+                    "headline": headline,
+                    "category": category,
+                    "impact": impact,
+                    "source": item["source"],
+                    "details": f"Scraped from {item['source']}. Sentiment score: {score}.",
+                    "forecast": item.get("forecast", ""),
+                    "previous": item.get("previous", ""),
+                    "isTriggeredShort": is_geo or is_macro,
+                    "isTriggeredGold": is_geo,
+                    "summaryId": f"Scraped news. Category: {category}. Short signal: {'ACTIVE' if (is_geo or is_macro) else 'INACTIVE'}."
+                }
+                async with news_feed_lock:
+                    news_feed.insert(0, new_item)
+                    if len(news_feed) > 50:
+                        news_feed.pop()
         except Exception as e:
             logger.error(f"[Scraper] Error in news scraper loop: {e}")
         await asyncio.sleep(180)

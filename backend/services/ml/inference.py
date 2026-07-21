@@ -137,11 +137,11 @@ def predict_live_with_gate(
         df_resampled = df_resampled.sort_index()
         
         resampled_df = pd.DataFrame()
-        resampled_df['open'] = df_resampled['open'].resample(f'{resample_minutes}T').first()
-        resampled_df['high'] = df_resampled['high'].resample(f'{resample_minutes}T').max()
-        resampled_df['low'] = df_resampled['low'].resample(f'{resample_minutes}T').min()
-        resampled_df['close'] = df_resampled['close'].resample(f'{resample_minutes}T').last()
-        resampled_df['volume'] = df_resampled['volume'].resample(f'{resample_minutes}T').sum()
+        resampled_df['open'] = df_resampled['open'].resample(f'{resample_minutes}min').first()
+        resampled_df['high'] = df_resampled['high'].resample(f'{resample_minutes}min').max()
+        resampled_df['low'] = df_resampled['low'].resample(f'{resample_minutes}min').min()
+        resampled_df['close'] = df_resampled['close'].resample(f'{resample_minutes}min').last()
+        resampled_df['volume'] = df_resampled['volume'].resample(f'{resample_minutes}min').sum()
         
         # Bring back the date column
         df_resampled = resampled_df.dropna().reset_index()
