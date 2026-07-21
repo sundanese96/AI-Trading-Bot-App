@@ -1,6 +1,6 @@
 {
   "forexfactory": {
-    "timestamp": 1784612521.14463,
+    "timestamp": 1784613243.0559602,
     "data": [
       {
         "title": "FF CALENDAR: GBP - Claimant Count Change (High Impact)",
@@ -103,11 +103,11 @@
     ]
   },
   "reuters": {
-    "timestamp": 1784612521.1661282,
+    "timestamp": 1784613243.0737247,
     "data": []
   },
   "bbc": {
-    "timestamp": 1784612521.3508499,
+    "timestamp": 1784613243.169007,
     "data": [
       {
         "title": "Trump slaps 50% tariffs on Canada and Carney vows to 'intensify' trade talks",
@@ -115,8 +115,8 @@
         "source": "BBC Scraper"
       },
       {
-        "title": "New UK Prime Minister Andy Burnham to set out cost of living support",
-        "url": "https://www.bbc.com/news/articles/c2lqdd44d0do",
+        "title": "US launches fresh strikes on Iran, as Trump warns of retaliation for deaths of soldiers",
+        "url": "https://www.bbc.com/news/articles/cx25wg2x26do",
         "source": "BBC Scraper"
       },
       {
@@ -130,8 +130,8 @@
         "source": "BBC Scraper"
       },
       {
-        "title": "US launches fresh strikes on Iran, as Trump warns of retaliation for deaths of soldiers",
-        "url": "https://www.bbc.com/news/articles/cx25wg2x26do",
+        "title": "Burnham to remove VAT from household electricity bills in first major policy announcement as PM",
+        "url": "https://www.bbc.com/news/live/cgrkv8e8l9qt",
         "source": "BBC Scraper"
       },
       {
@@ -152,7 +152,7 @@
     ]
   },
   "cryptopanic": {
-    "timestamp": 1784612521.7608092,
+    "timestamp": 1784613243.6861908,
     "data": []
   }
 }
