@@ -473,7 +473,7 @@ export default function App() {
       const size = Number(pos.size) || 0;
       if (entryPrice === 0 || size === 0) return sum; // prevent NaN/Infinity
       
-      const symbol = pos.symbol || pos.targetAsset || "UNKNOWN";
+      const symbol = pos.symbol || "UNKNOWN";
       const currentPrice = Number(livePrices[symbol]) || entryPrice;
       
       const priceDiff = pos.type === "BUY" ? currentPrice - entryPrice : entryPrice - currentPrice;

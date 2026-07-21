@@ -3,6 +3,7 @@ import time
 import asyncio
 from backend.core.logger import logger
 from backend.helpers.utils import get_asset_current_price
+from backend.sentix_adapter import sentix_state
 
 
 async def monitor_simulated_positions_loop():
@@ -51,12 +52,13 @@ async def monitor_simulated_positions_loop():
                             price_change_pct = ((entry_price - cur_price) / entry_price) * 100
                             
                         pnl_pct = price_change_pct * leverage
-                        trade["pnl"] = round(pnl_pct, 2)
+                        margin_used = trade.get("margin", entry_price)
+                        pnl_dollar = (pnl_pct / 100.0) * margin_used
+                        trade["pnl"] = round(pnl_dollar, 2)
                         
                         triggered_close = False
                         close_reason = ""
                         
-                        from backend.sentix_adapter import sentix_state
                         ts_pct = float(sentix_state.get("aiBotSettings", {}).get("trailingStopPct", 0.5))
                         
                         if decision == "LONG":
@@ -80,9 +82,8 @@ async def monitor_simulated_positions_loop():
                             close_reason = "TAKE_PROFIT"
                         # 3. Timeout check (Configurable)
                         elif not triggered_close:
-                            from backend.sentix_adapter import sentix_state
                             max_hold_mins = int(sentix_state.get("aiBotSettings", {}).get("maxHoldMinutes", 0))
-                            if max_hold_mins > 0 and int(time.time() * 1000) - trade.get("timestamp", 0) > max_hold_mins * 60 * 1000:
+                            if max_hold_mins > 0 and int(time.time() * 1000) - trade.get("timestamp", 0) >= max_hold_mins * 60 * 1000:
                                 triggered_close = True
                                 close_reason = "TIMEOUT"
                             
@@ -104,7 +105,7 @@ async def monitor_simulated_positions_loop():
                                 db["pnlLog"] = []
                             db["pnlLog"].append({
                                 "timestamp": int(time.time() * 1000),
-                                "pnl": round(pnl_pct, 2)
+                                "pnl": round(pnl_dollar, 2)
                             })
                             
                             # Send Telegram notification for the closed simulated position!
@@ -115,11 +116,11 @@ async def monitor_simulated_positions_loop():
                                 f"*Action*: {decision}\n"
                                 f"*Entry Price*: ${entry_price}\n"
                                 f"*Exit Price*: ${cur_price}\n"
-                                f"*Final PnL*: {round(pnl_pct, 2)}% ({'🟢 Profit' if pnl_pct > 0 else '🔴 Loss'})\n"
+                                f"*Final PnL*: ${round(pnl_dollar, 2)} ({'🟢 Profit' if pnl_dollar > 0 else '🔴 Loss'})\n"
                                 f"*Headline*: {trade.get('headline', '')}"
                             )
                             asyncio.create_task(send_telegram_alert(closed_msg))
-                            logger.info(f"[Sim Position Monitor] CLOSED POSITION: {decision} {symbol} at {cur_price} | PnL: {pnl_pct:.2f}%")
+                            logger.info(f"[Sim Position Monitor] CLOSED POSITION: {decision} {symbol} at {cur_price} | PnL: ${pnl_dollar:.2f}")
                             
                         updated = True
                         
@@ -194,7 +195,8 @@ async def force_close_all_simulated_positions():
                 price_change_pct = ((cur_price - entry_price) / entry_price) * 100 if entry_price > 0 else 0
                 if sim_trade.get("decision") != "LONG":
                     price_change_pct = -price_change_pct
-                sim_trade["pnl"] = round(price_change_pct * leverage, 2)
+                margin_used = sim_trade.get("margin", entry_price)
+                sim_trade["pnl"] = round((price_change_pct / 100.0) * margin_used, 2)
                 updated = True
                 
         if updated:

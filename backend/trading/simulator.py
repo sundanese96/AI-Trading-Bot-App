@@ -37,22 +37,7 @@ async def _execute_simulated_trade(headline, target_asset, decision, confidence,
     sentix_state["aiBotLogs"].insert(0, log_entry)
     sentix_state["aiBotLogs"] = sentix_state["aiBotLogs"][:100]
     
-    # ADD TO NEWS FEED TO PREVENT DUPLICATES ON NEXT SCRAPE
-    async with news_feed_lock:
-        if not any(n.get("headline") == headline for n in news_feed):
-            news_feed.insert(0, {
-                "id": f"news-{int(time.time() * 1000)}",
-                "time": time.strftime("%H:%M:%S"),
-                "headline": headline,
-                "category": "AI_PROCESSED",
-                "impact": "HIGH" if decision in ["LONG", "SHORT"] else "NEUTRAL",
-                "source": "System/AI",
-                "details": f"Processed by AI Bot. Confidence: {confidence}%.",
-                "isTriggeredShort": decision == "SHORT",
-                "isTriggeredGold": False,
-                "summaryId": f"AI Bot Evaluated. Decision: {decision}"
-            })
-            if len(news_feed) > 50: news_feed.pop()
+    # NOTE: news_feed insert is handled by analyze_ai() in routes/ai.py — skipping duplicate insert here
     
     risk = _calculate_risk_parameters(bot_settings, live_price, decision, strategy)
     
@@ -100,7 +85,7 @@ async def _execute_simulated_trade(headline, target_asset, decision, confidence,
                     "recommendedLeverage": f"{risk['lev']}x", "recommendedStopLoss": f"{risk['sl_pct_raw']}%", "recommendedTakeProfit": f"{risk['tp_pct_raw']}%",
                     "strategyReasoning": f"[{strategy} Strategy] {trade_decision.get('strategyReasoning', '')}",
                     "status": "OPEN", "entryPrice": live_price, "currentPrice": live_price, "exitPrice": None, "closeTime": None,
-                    "closeReason": None, "pnl": 0.0, "headline": headline, "type": "SIMULATED"
+                    "closeReason": None, "pnl": 0.0, "headline": headline, "type": "SIMULATED", "margin": risk["margin"]
                 }
                 if strategy == "HEDGING":
                     sim["strategyReasoning"] = f"[HEDGING Strategy] Dual directional entry. {trade_decision.get('strategyReasoning', '')}"

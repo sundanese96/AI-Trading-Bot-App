@@ -160,7 +160,7 @@ export function AIBotPanel({ savedModels, llmSettings, active }: AIBotPanelProps
       if (data.status === "SIMULATED") {
         alert("Simulasi step dijalankan: " + data.message);
       }
-      pollBotStatus();
+      fetchInitialSettings();
     } catch (e: any) {
       alert("Gagal memicu bot step: " + (e.message || "Network error"));
     } finally {

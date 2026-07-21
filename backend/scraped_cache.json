@@ -1,12 +1,12 @@
 {
   "forexfactory": {
-    "timestamp": 1784522949.6473541,
+    "timestamp": 1784612521.14463,
     "data": [
       {
         "title": "FF CALENDAR: GBP - Claimant Count Change (High Impact)",
         "url": "https://www.forexfactory.com/calendar",
         "source": "ForexFactory Calendar",
-        "forecast": "28.3K",
+        "forecast": "29.4K",
         "previous": "31.2K"
       },
       {
@@ -55,28 +55,28 @@
         "title": "FF CALENDAR: GBP - Retail Sales m/m (Medium Impact)",
         "url": "https://www.forexfactory.com/calendar",
         "source": "ForexFactory Calendar",
-        "forecast": "-0.1%",
+        "forecast": "-0.3%",
         "previous": "1.2%"
       },
       {
         "title": "FF CALENDAR: EUR - French Flash Manufacturing PMI (Medium Impact)",
         "url": "https://www.forexfactory.com/calendar",
         "source": "ForexFactory Calendar",
-        "forecast": "51.2",
+        "forecast": "51.0",
         "previous": "50.7"
       },
       {
         "title": "FF CALENDAR: EUR - French Flash Services PMI (Medium Impact)",
         "url": "https://www.forexfactory.com/calendar",
         "source": "ForexFactory Calendar",
-        "forecast": "47.7",
+        "forecast": "47.5",
         "previous": "47.4"
       },
       {
         "title": "FF CALENDAR: EUR - German Flash Manufacturing PMI (Medium Impact)",
         "url": "https://www.forexfactory.com/calendar",
         "source": "ForexFactory Calendar",
-        "forecast": "50.5",
+        "forecast": "50.4",
         "previous": "50.0"
       },
       {
@@ -90,7 +90,7 @@
         "title": "FF CALENDAR: GBP - Flash Manufacturing PMI (Medium Impact)",
         "url": "https://www.forexfactory.com/calendar",
         "source": "ForexFactory Calendar",
-        "forecast": "52.1",
+        "forecast": "52.0",
         "previous": "53.1"
       },
       {
@@ -103,56 +103,56 @@
     ]
   },
   "reuters": {
-    "timestamp": 1784522949.733294,
+    "timestamp": 1784612521.1661282,
     "data": []
   },
   "bbc": {
-    "timestamp": 1784522949.3625693,
+    "timestamp": 1784612521.3508499,
     "data": [
       {
-        "title": "Spain beat Argentina to win World Cup for second time",
-        "url": "https://www.bbc.com/sport/football/live/cgk4ymn3n72t",
+        "title": "Trump slaps 50% tariffs on Canada and Carney vows to 'intensify' trade talks",
+        "url": "https://www.bbc.com/news/articles/cg4dzq3x3e1o",
         "source": "BBC Scraper"
       },
       {
-        "title": "Moment fans in Madrid celebrate World Cup win",
-        "url": "https://www.bbc.com/news/videos/cgr701xrg14o",
+        "title": "New UK Prime Minister Andy Burnham to set out cost of living support",
+        "url": "https://www.bbc.com/news/articles/c2lqdd44d0do",
         "source": "BBC Scraper"
       },
       {
-        "title": "\u2018Everyone's afraid to die\u2019: Struggle to recruit soldiers in Ukraine turns violent",
-        "url": "https://www.bbc.com/news/articles/cr7k5ngde3vo",
+        "title": "The 20-somethings betting big on tech stocks",
+        "url": "https://www.bbc.com/news/articles/c20yz9v1llro",
         "source": "BBC Scraper"
       },
       {
-        "title": "US soldier killed and one injured after Iranian attack in Iraq",
-        "url": "https://www.bbc.com/news/articles/cgk417jp83po",
+        "title": "BBC reveals official report into deadly military jet crash at school",
+        "url": "https://www.bbc.com/news/videos/c0l5gg5ye5ro",
         "source": "BBC Scraper"
       },
       {
-        "title": "Andy Burnham to become PM as Keir Starmer prepares to leave No 10",
-        "url": "https://www.bbc.com/news/live/cgrkv8e8l9qt",
+        "title": "US launches fresh strikes on Iran, as Trump warns of retaliation for deaths of soldiers",
+        "url": "https://www.bbc.com/news/articles/cx25wg2x26do",
         "source": "BBC Scraper"
       },
       {
-        "title": "Chris Mason: Burnham is fifth PM in four years - now he'll try to buck the trend",
-        "url": "https://www.bbc.com/news/articles/cr7knml2y99o",
+        "title": "Indonesia court delivers verdict on group accused of selling babies for adoption in Singapore",
+        "url": "https://www.bbc.com/news/live/c330d4ee4znt",
         "source": "BBC Scraper"
       },
       {
-        "title": "Food delivery rider wins China's top literary prize",
-        "url": "https://www.bbc.com/news/articles/c5ydr3xd0kvo",
+        "title": "'If only people knew what a tick could do' - the deadly meat allergy caused by tick bites",
+        "url": "https://www.bbc.com/news/articles/cj6g03567edo",
         "source": "BBC Scraper"
       },
       {
-        "title": "India's cockroach protesters set to march to parliament",
-        "url": "https://www.bbc.com/news/articles/c0l58lw089no",
+        "title": "Video appears to show confrontation between Chinese and Philippine navy vessels",
+        "url": "https://www.bbc.com/news/videos/c9w0l50wegzo",
         "source": "BBC Scraper"
       }
     ]
   },
   "cryptopanic": {
-    "timestamp": 1784522949.8279963,
+    "timestamp": 1784612521.7608092,
     "data": []
   }
 }

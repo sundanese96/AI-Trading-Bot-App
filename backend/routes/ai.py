@@ -145,13 +145,13 @@ async def analyze_ai(req: AIAnalyzeRequest):
         trade_decision_fallback = {
             "decision": "SHORT" if (is_geopolitical or is_macro) else "HOLD",
             "targetAsset": target_asset,
-            "confidence": 88 if is_geopolitical else (78 if is_macro else 10),
-            "recommendedLeverage": "10x" if (is_geopolitical or is_macro) else "N/A",
-            "recommendedStopLoss": "4.5%" if (is_geopolitical or is_macro) else "N/A",
+            "confidence": 35 if is_geopolitical else (30 if is_macro else 10),
+            "recommendedLeverage": "5x" if (is_geopolitical or is_macro) else "N/A",
+            "recommendedStopLoss": "2.5%" if (is_geopolitical or is_macro) else "N/A",
             "strategyReasoning": (
-                f"Dampak eskalasi geopolitik memicu aliran likuiditas keluar dari koin-koin beta tinggi menuju Emas. Eksekusi SHORT {target_asset} terkonfirmasi."
+                f"Dampak eskalasi geopolitik memicu aliran likuiditas keluar dari koin-koin beta tinggi menuju Emas. Eksekusi SHORT {target_asset} terkonfirmasi. Confidence terbatas (<35%) karena data historis menunjukkan win rate rendah pada timeframe 15 menit."
                 if is_geopolitical else
-                (f"Data makroekonomi positif untuk Dolar AS memicu lonjakan DXY, yang menekan koin secara ekstrem. Rekomendasi SHORT {target_asset}."
+                (f"Data makroekonomi positif untuk Dolar AS memicu lonjakan DXY, yang menekan likuiditas aset kripto secara luas. Rekomendasi SHORT {target_asset}. Confidence terbatas (<30%) karena deviasi historis kecil pada window 15 menit."
                  if is_macro else
                  "Pasar stabil tanpa deviasi ekstrem yang terdeteksi. Disarankan HOLD dan menunggu krisis terkonfirmasi.")
             )
@@ -379,7 +379,7 @@ Gunakan data real-time, volatilitas pasar, sentimen berita, indeks Fear & Greed,
         used_model = ""
 
         if req.provider == "gemini":
-            used_model = "gemini-3.5-flash"
+            used_model = "gemini-2.0-flash"
         elif req.provider == "openai":
             used_model = req.customModel or "gpt-4o-mini"
         elif req.provider == "anthropic":

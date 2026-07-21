@@ -111,7 +111,19 @@ async def reset_portfolio():
     async with sentix_state_lock:
         sentix_state["portfolio"] = {"balanceUSD": 100000.0, "assets": {}, "initialBalance": 100000.0}
         sentix_state["trades"] = []
-        _save_sentix_db()
+
+    # Save to disk outside async lock (threading.Lock + file I/O can deadlock with asyncio.Lock)
+    await asyncio.to_thread(_save_sentix_db)
+    # Also reset trades in database.json to keep both stores in sync
+    try:
+        from backend.database import read_database_async, write_database_async, db_lock
+        async with db_lock:
+            db = await read_database_async()
+            db["savedTrades"] = []
+            db["pnlLog"] = []
+            await write_database_async(db)
+    except Exception as e:
+        logger.error(f"[Portfolio Reset] Failed to sync database.json: {e}")
     return {"success": True, "message": "Portofolio direset berhasil."}
 
 
@@ -166,8 +178,10 @@ async def execute_trade(request: Request):
     async with sentix_state_lock:
         sentix_state["trades"].append(trade)
         sentix_state["portfolio"]["balanceUSD"] = round(sentix_state["portfolio"]["balanceUSD"] - margin, 2)
-        _save_sentix_db()
-        return {"success": True, "message": "Order berhasil dieksekusi.", "trades": sentix_state["trades"]}
+
+    # Save to disk outside async lock (threading.Lock + file I/O can deadlock with asyncio.Lock)
+    await asyncio.to_thread(_save_sentix_db)
+    return {"success": True, "message": "Order berhasil dieksekusi.", "trades": sentix_state["trades"]}
 
 async def close_active_position(trade_id: str, exit_price: float = None) -> Dict[str, Any]:
     """
@@ -198,8 +212,9 @@ async def close_active_position(trade_id: str, exit_price: float = None) -> Dict
         margin_used = (trade["size"] * trade["entryPrice"]) / trade["leverage"]
         refund = margin_used + net_pnl
         sentix_state["portfolio"]["balanceUSD"] = round(sentix_state["portfolio"]["balanceUSD"] + refund, 2)
-        
-        _save_sentix_db()
+
+    # Save to disk outside async lock (threading.Lock + file I/O can deadlock with asyncio.Lock)
+    await asyncio.to_thread(_save_sentix_db)
     
     # Try to close matching trade in database.json
     try:
@@ -370,7 +385,9 @@ async def save_ai_bot_settings(request: Request):
                 body["activatedAt"] = 0
                 
         sentix_state["aiBotSettings"].update(body)
-        _save_sentix_db()
+
+    # Save to disk outside async lock (threading.Lock + file I/O can deadlock with asyncio.Lock)
+    await asyncio.to_thread(_save_sentix_db)
     return {"success": True, "message": "Konfigurasi AI Bot berhasil disimpan."}
 
 @router.get("/api/ai-bot/status")
@@ -379,7 +396,7 @@ async def get_ai_bot_status(response: Response):
     response.headers["Pragma"] = "no-cache"
     response.headers["Expires"] = "0"
     bot = sentix_state["aiBotSettings"]
-    active_trades = [t for t in sentix_state["trades"] if t["status"] == "OPEN" and ("bot" in t["id"] or t.get("reason") == "AI_BOT" or t.get("reason", "").startswith("AI_BOT"))]
+    active_trades = [t for t in sentix_state["trades"] if t["status"] == "OPEN" and (t.get("reason", "").startswith("AI_BOT") or t["id"].startswith("trade-bot-"))]
     logs = sentix_state.get("aiBotLogs", [])
     last_log_time = logs[0]["timestamp"] if logs else 0
 

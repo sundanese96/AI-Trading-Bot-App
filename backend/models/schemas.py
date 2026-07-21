@@ -37,6 +37,11 @@ class SaveAIConfigRequest(BaseModel):
     maxDailyLoss: Optional[float] = 5.0
     maxTradesPerDay: Optional[int] = 5
     confidenceThreshold: Optional[int] = 75
+    telegramBotToken: Optional[str] = ""
+    telegramChatId: Optional[str] = ""
+    mlTargetWindow: Optional[int] = 15
+    mlThresholdPct: Optional[float] = 0.15
+    mlModelType: Optional[str] = "xgboost"
 
 class ExecuteOrderRequest(BaseModel):
     symbol: str
