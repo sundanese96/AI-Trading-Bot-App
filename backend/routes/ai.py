@@ -614,8 +614,11 @@ Gunakan data real-time, volatilitas pasar, sentimen berita, indeks Fear & Greed,
             "summaryId": f"AI Terminal ({req.provider.upper()}): Crisis {parsed_analysis.get('crisisKeywords', [])} detected. Short signal: {'ACTIVE' if is_triggered_short else 'INACTIVE'}."
         }
 
-        async with news_feed_lock:
-            news_feed.insert(0, generated_event)
+        if req.source != "System Indicator":
+            async with news_feed_lock:
+                news_feed.insert(0, generated_event)
+                if len(news_feed) > 50:
+                    news_feed.pop()
 
         if is_geopolitical:
             current_panic.update({ "active": True, "type": "GEOPOLITICS", "title": req.headline, "timeLeft": 15 })
