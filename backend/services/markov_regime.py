@@ -53,39 +53,68 @@ DEFAULT_MIN_TRAIN = 252
 # --------------------------------------------------------------------------- #
 # Data loading — asset-agnostic. Either a ticker or a user's own CSV.
 # --------------------------------------------------------------------------- #
+def fetch_ticker_binance(ticker: str) -> pd.Series:
+    """Fetch daily close prices from Binance Public API (1000 daily candles, ~3 years).
+
+    Fast, reliable, and avoids Yahoo Finance IP rate-limiting on cloud VPS.
+    """
+    import urllib.request
+    import json
+
+    sym = ticker.upper().replace("-USD", "").replace("USDT", "")
+    pair = f"{sym}USDT"
+
+    urls = [
+        f"https://api.binance.com/api/v3/klines?symbol={pair}&interval=1d&limit=1000",
+        f"https://fapi.binance.com/fapi/v1/klines?symbol={pair}&interval=1d&limit=1000"
+    ]
+
+    for url in urls:
+        try:
+            req = urllib.request.Request(url, headers={'User-Agent': 'Mozilla/5.0'})
+            with urllib.request.urlopen(req, timeout=5.0) as resp:
+                if resp.status == 200:
+                    data = json.loads(resp.read().decode('utf-8'))
+                    if isinstance(data, list) and len(data) > 30:
+                        dates = pd.to_datetime([row[0] for row in data], unit='ms')
+                        closes = [float(row[4]) for row in data]
+                        series = pd.Series(closes, index=dates, name=ticker)
+                        return series
+        except Exception:
+            continue
+
+    return pd.Series(dtype=float)
+
+
 def fetch_ticker(ticker: str, years: int = DEFAULT_YEARS) -> pd.Series:
-    """Fetch a daily close series via yfinance, with one retry on empty data."""
+    """Fetch a daily close series. Tries Binance API first for crypto, fallback to yfinance."""
+    # 1. Try Binance API first (ideal for crypto tickers & VPS deployments)
+    binance_series = fetch_ticker_binance(ticker)
+    if not binance_series.empty and len(binance_series) > 30:
+        return binance_series
+
+    # 2. Fallback to yfinance (for non-crypto or if Binance unavailable)
     import yfinance as yf
 
     end = pd.Timestamp.now("UTC").tz_localize(None).normalize()
     start = end - pd.DateOffset(years=years)
 
     df = pd.DataFrame()
-    for attempt in (1, 2):
-        try:
-            df = yf.download(
-                ticker,
-                start=start.strftime("%Y-%m-%d"),
-                end=end.strftime("%Y-%m-%d"),
-                progress=False,
-                auto_adjust=True,
-            )
-        except Exception as exc:  # noqa: BLE001
-            print(f"  ! yfinance error on attempt {attempt}: {exc}", file=sys.stderr)
-            df = pd.DataFrame()
-
-        if not df.empty:
-            break
-        if attempt == 1:
-            print(
-                "  ! yfinance returned empty data — retrying in 30s.", file=sys.stderr
-            )
-            time.sleep(30)
+    try:
+        df = yf.download(
+            ticker,
+            start=start.strftime("%Y-%m-%d"),
+            end=end.strftime("%Y-%m-%d"),
+            progress=False,
+            auto_adjust=True,
+        )
+    except Exception as exc:  # noqa: BLE001
+        print(f"  ! yfinance error: {exc}", file=sys.stderr)
 
     if df.empty:
         raise RuntimeError(
-            f"yfinance returned empty data for {ticker} after retry. "
-            "Yahoo may be rate-limiting. Try again in a few minutes."
+            f"Unable to fetch price history for {ticker}. "
+            "Binance and Yahoo Finance APIs were unavailable or rate-limited."
         )
 
     # Some yfinance versions return a MultiIndex column frame.
