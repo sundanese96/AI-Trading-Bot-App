@@ -857,7 +857,8 @@ from backend.services.indicators import (
 )
 
 def run_backtest_simulation(params: dict):
-    symbol = params.get("symbol", "BTCUSDT")
+    raw_symbol = str(params.get("symbol", "BTCUSDT"))
+    symbol = raw_symbol.replace("/", "").replace("-", "").upper()
     strategy = params.get("strategy", "SMA_CROSS")
     interval = params.get("interval", "1h")
     start_bal = float(params.get("startingBalance", 10000))
@@ -874,16 +875,28 @@ def run_backtest_simulation(params: dict):
     import httpx
     import time
     import random
+    from backend.config import VERIFY_SSL
     
     # 1. Fetch candles
     klines = []
     try:
         # Fetch up to 300 historical candles
-        url = f"https://api.binance.com/api/v3/klines?symbol={symbol}&interval={interval}&limit=300"
-        with httpx.Client(verify=False) as client:
-            resp = client.get(url, timeout=5.0)
-            if resp.status_code == 200:
-                klines = resp.json()
+        urls = [
+            f"https://api.binance.com/api/v3/klines?symbol={symbol}&interval={interval}&limit=300",
+            f"https://fapi.binance.com/fapi/v1/klines?symbol={symbol}&interval={interval}&limit=300"
+        ]
+        headers = {'User-Agent': 'Mozilla/5.0'}
+        with httpx.Client(verify=VERIFY_SSL, headers=headers) as client:
+            for url in urls:
+                try:
+                    resp = client.get(url, timeout=5.0)
+                    if resp.status_code == 200:
+                        data = resp.json()
+                        if isinstance(data, list) and len(data) > 0:
+                            klines = data
+                            break
+                except Exception:
+                    continue
     except Exception as e:
         logger.error(f"[Backtester] Binance fetch failed: {e}. Falling back to simulation.")
 
@@ -1198,9 +1211,12 @@ def run_backtest_simulation(params: dict):
 
 @router.post("/api/backtest")
 async def run_backtest(request: Request):
-    body = await request.json()
     try:
-        report = run_backtest_simulation(body)
+        body = await request.json()
+    except Exception:
+        body = {}
+    try:
+        report = await asyncio.to_thread(run_backtest_simulation, body)
         return {"success": True, "report": report}
     except Exception as e:
         logger.error(f"[Backtester Error] {e}")
