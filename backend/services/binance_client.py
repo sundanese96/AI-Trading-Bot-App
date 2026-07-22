@@ -1,10 +1,8 @@
 import os
-import hmac
-import hashlib
 import time
-import httpx
 import asyncio
 from typing import Dict, Any, Optional
+import ccxt
 from backend.database import load_ai_config, lock_bot
 from backend.config import VERIFY_SSL
 
@@ -16,18 +14,16 @@ BINANCE_API_KEY = os.getenv("BINANCE_API_KEY", "")
 BINANCE_API_SECRET = os.getenv("BINANCE_API_SECRET", "")
 USE_TESTNET = os.getenv("BINANCE_USE_TESTNET", "true").lower() == "true"
 
-# Base URLs
-SPOT_BASE_URL = "https://testnet.binance.vision" if USE_TESTNET else "https://api.binance.com"
-FUTURES_BASE_URL = "https://fapi.binancefuture.com" if USE_TESTNET else "https://fapi.binance.com"
-
-def generate_signature(query_string: str, secret: str) -> str:
-    return hmac.new(secret.encode("utf-8"), query_string.encode("utf-8"), hashlib.sha256).hexdigest()
-
-async def get_binance_headers(api_key: str) -> Dict[str, str]:
-    return {
-        "X-MBX-APIKEY": api_key,
-        "Content-Type": "application/x-www-form-urlencoded"
-    }
+def _get_ccxt_client(api_key: str, api_secret: str) -> ccxt.binanceusdm:
+    """Initializes and returns a CCXT Binance USD-M Futures client."""
+    config = {}
+    if api_key and api_secret:
+        config["apiKey"] = api_key
+        config["secret"] = api_secret
+    client = ccxt.binanceusdm(config)  # type: ignore
+    if USE_TESTNET:
+        client.set_sandbox_mode(True)
+    return client
 
 async def execute_futures_order(
     symbol: str,
@@ -40,7 +36,7 @@ async def execute_futures_order(
     take_profit_pct: Optional[float] = None
 ) -> Dict[str, Any]:
     """
-    Executes a Futures order on Binance (Spot/Futures Testnet or Mainnet).
+    Executes a Futures order on Binance (Spot/Futures Testnet or Mainnet) using CCXT.
     Includes automatic leverage setting and SL/TP bracket orders.
     """
     # Load credentials and risk settings from database config
@@ -104,17 +100,17 @@ async def execute_futures_order(
     # Strict Risk Guard: Limit leverage to 10x max for safety
     safe_leverage = min(10, max(1, leverage))
 
-    symbol_usdt = f"{symbol}USDT"
+    # Format symbol for ccxt / binance (e.g. BTCUSDT)
+    symbol_formatted = f"{symbol}USDT".upper()
     
-    # 1.5 Fetch current ticker price to estimate safety caps
+    # 1.5 Fetch current ticker price to estimate safety caps using CCXT client (read-only)
     ticker_price = 0.0
     try:
-        async with httpx.AsyncClient(verify=VERIFY_SSL) as client:
-            ticker_url = f"{FUTURES_BASE_URL}/fapi/v1/ticker/price"
-            ticker_query = f"symbol={symbol_usdt}"
-            ticker_res = await client.get(f"{ticker_url}?{ticker_query}", timeout=5.0)
-            if ticker_res.status_code == 200:
-                ticker_price = float(ticker_res.json().get("price", 0))
+        # Initialize a temporary or public CCXT client to fetch ticker
+        client_pub = _get_ccxt_client("", "")
+        ticker_res = await asyncio.to_thread(client_pub.fetch_ticker, symbol_formatted)
+        if ticker_res:
+            ticker_price = float(ticker_res.get("last", 0.0) or ticker_res.get("close", 0.0))  # type: ignore
     except Exception as e:
         print(f"[Binance Futures] Warning: Ticker price fetch failed: {e}")
 
@@ -135,29 +131,12 @@ async def execute_futures_order(
                 "message": "Binance API Key or Secret is missing. Please configure it in Settings."
             }
         try:
-            async with httpx.AsyncClient(verify=VERIFY_SSL) as client:
-                headers = await get_binance_headers(api_key)
-                account_url = f"{FUTURES_BASE_URL}/fapi/v2/account"
-                timestamp = int(time.time() * 1000)
-                account_query = f"timestamp={timestamp}"
-                account_signature = generate_signature(account_query, api_secret)
-                account_payload = f"{account_query}&signature={account_signature}"
-                
-                account_res = await client.get(f"{account_url}?{account_payload}", headers=headers, timeout=10.0)
-                if account_res.status_code == 200:
-                    acc_data = account_res.json()
-                    usdt_asset = next((a for a in acc_data.get("assets", []) if a.get("asset") == "USDT"), None)
-                    if usdt_asset:
-                        available_balance = float(usdt_asset.get("availableBalance", 0.0))
-                        total_balance = float(usdt_asset.get("marginBalance", 0.0)) or float(usdt_asset.get("walletBalance", 0.0))
-                    else:
-                        available_balance = float(acc_data.get("availableBalance", 0.0))
-                        total_balance = float(acc_data.get("totalWalletBalance", 0.0))
-                else:
-                    return {
-                        "status": "error",
-                        "message": f"Failed to fetch account balance: {account_res.text}"
-                    }
+            client_priv = _get_ccxt_client(api_key, api_secret)
+            # Use ccxt fetch_balance
+            bal = await asyncio.to_thread(client_priv.fetch_balance)
+            usdt_asset = bal.get("USDT") or {}
+            available_balance = float(usdt_asset.get("free", 0.0))  # type: ignore
+            total_balance = float(usdt_asset.get("total", 0.0))  # type: ignore
         except Exception as e:
             return {
                 "status": "error",
@@ -212,205 +191,196 @@ async def execute_futures_order(
     results = {"order": None, "stop_loss": None, "take_profit": None}
 
     try:
-        async with httpx.AsyncClient(verify=VERIFY_SSL) as client:
-            # 1. Set Leverage
-            leverage_url = f"{FUTURES_BASE_URL}/fapi/v1/leverage"
-            timestamp = int(time.time() * 1000)
-            query = f"symbol={symbol_usdt}&leverage={safe_leverage}&timestamp={timestamp}"
-            signature = generate_signature(query, api_secret)
-            payload = f"{query}&signature={signature}"
-            
-            headers = await get_binance_headers(api_key)
-            lev_res = await client.post(leverage_url, headers=headers, content=payload, timeout=10.0)
-            if lev_res.status_code != 200:
-                print(f"[Binance Futures] Failed to set leverage: {lev_res.text}")
+        client = _get_ccxt_client(api_key, api_secret)
+        
+        # 1. Set Leverage
+        try:
+            await asyncio.to_thread(client.set_leverage, safe_leverage, symbol_formatted)
+        except Exception as lev_err:
+            print(f"[Binance Futures] Failed to set leverage: {lev_err}")
 
-            # 1.5 Fetch current ticker price to estimate Stop-Loss price
-            ticker_url = f"{FUTURES_BASE_URL}/fapi/v1/ticker/price"
-            ticker_query = f"symbol={symbol_usdt}"
-            ticker_res = await client.get(f"{ticker_url}?{ticker_query}", headers=headers, timeout=10.0)
-            if ticker_res.status_code == 200:
-                ticker_price = float(ticker_res.json().get("price", 0))
-            else:
-                ticker_price = 0.0
-                
-            if ticker_price <= 0:
-                return {
-                    "status": "error",
-                    "message": f"Failed to fetch market price for {symbol_usdt}. Cannot calculate safety thresholds."
-                }
-
-            opposite_side = "SELL" if side == "BUY" else "BUY"
+        # 1.5 Fetch current ticker price to estimate Stop-Loss price
+        try:
+            ticker_res = await asyncio.to_thread(client.fetch_ticker, symbol_formatted)
+            ticker_price = float(ticker_res.get("last", 0.0) or ticker_res.get("close", 0.0))  # type: ignore
+        except Exception as e:
+            ticker_price = 0.0
             
-            # Calculate estimated SL price
-            sl_price = ticker_price * (1 - stop_loss_pct / 100.0) if side == "BUY" else ticker_price * (1 + stop_loss_pct / 100.0)
-            sl_price = round(sl_price, 4 if symbol == "XRP" else 2)
-            
-            # Calculate estimated TP price (if requested)
-            tp_price = None
-            if take_profit_pct:
-                tp_price = ticker_price * (1 + take_profit_pct / 100.0) if side == "BUY" else ticker_price * (1 - take_profit_pct / 100.0)
-                tp_price = round(tp_price, 4 if symbol == "XRP" else 2)
-
-            # Construct batchOrders JSON list
-            batch_orders_list = [
-                {
-                    "symbol": symbol_usdt,
-                    "side": side,
-                    "positionSide": position_side,
-                    "type": order_type,
-                    "quantity": str(quantity)
-                },
-                {
-                    "symbol": symbol_usdt,
-                    "side": opposite_side,
-                    "positionSide": position_side,
-                    "type": "STOP_MARKET",
-                    "stopPrice": str(sl_price),
-                    "closePosition": "true"
-                }
-            ]
-            
-            if tp_price:
-                batch_orders_list.append({
-                    "symbol": symbol_usdt,
-                    "side": opposite_side,
-                    "positionSide": position_side,
-                    "type": "TAKE_PROFIT_MARKET",
-                    "stopPrice": str(tp_price),
-                    "closePosition": "true"
-                })
-
-            # 2. Place Atomic Batch Orders
-            import urllib.parse
-            import json
-            
-            batch_url = f"{FUTURES_BASE_URL}/fapi/v1/batchOrders"
-            timestamp = int(time.time() * 1000)
-            batch_json = json.dumps(batch_orders_list)
-            batch_order_str = urllib.parse.quote(batch_json)
-            
-            query = f"batchOrders={batch_order_str}&timestamp={timestamp}"
-            signature = generate_signature(query, api_secret)
-            payload = f"{query}&signature={signature}"
-            
-            batch_res = await client.post(batch_url, headers=headers, content=payload, timeout=10.0)
-            if batch_res.status_code != 200:
-                return {
-                    "status": "error",
-                    "message": f"Failed to place batch order: {batch_res.text}"
-                }
-                
-            batch_data = batch_res.json()
-            if not isinstance(batch_data, list) or len(batch_data) < 2:
-                return {
-                    "status": "error",
-                    "message": f"Unexpected batch order response format: {batch_res.text}"
-                }
-                
-            main_order_data = batch_data[0]
-            sl_order_data = batch_data[1]
-            tp_order_data = batch_data[2] if len(batch_data) > 2 else None
-            
-            # Inspect Main Order
-            if "code" in main_order_data:
-                return {
-                    "status": "error",
-                    "message": f"Failed to place main order in batch: {main_order_data.get('msg')}"
-                }
-                
-            results["order"] = main_order_data
-            entry_price = float(main_order_data.get("avgPrice", 0)) or float(main_order_data.get("price", 0))
-            
-            # Inspect Stop Loss Order
-            sl_placed = "code" not in sl_order_data
-            if sl_placed:
-                results["stop_loss"] = sl_order_data
-            else:
-                # 3. Retry Logic & emergency failsafe for Stop Loss if it failed in the batch
-                print(f"[Binance Futures] Stop Loss placement failed in batch: {sl_order_data.get('msg')}. Initializing retry loop...")
-                max_retries = 3
-                backoff_delay = 0.5
-                sl_retry_success = False
-                
-                # Recalculate based on real entry price if possible
-                if entry_price > 0:
-                    sl_price = entry_price * (1 - stop_loss_pct / 100.0) if side == "BUY" else entry_price * (1 + stop_loss_pct / 100.0)
-                    sl_price = round(sl_price, 4 if symbol == "XRP" else 2)
-                
-                for attempt in range(max_retries):
-                    await asyncio.sleep(backoff_delay)
-                    print(f"[Binance Futures] Retrying Stop Loss order (Attempt {attempt+1}/{max_retries})...")
-                    
-                    timestamp = int(time.time() * 1000)
-                    sl_url = f"{FUTURES_BASE_URL}/fapi/v1/order"
-                    sl_query = (
-                        f"symbol={symbol_usdt}&side={opposite_side}&positionSide={position_side}&"
-                        f"type=STOP_MARKET&stopPrice={sl_price}&closePosition=true&timestamp={timestamp}"
-                    )
-                    sl_signature = generate_signature(sl_query, api_secret)
-                    sl_payload = f"{sl_query}&signature={sl_signature}"
-                    
-                    try:
-                        sl_retry_res = await client.post(sl_url, headers=headers, content=sl_payload, timeout=10.0)
-                        if sl_retry_res.status_code == 200 and "code" not in sl_retry_res.json():
-                            results["stop_loss"] = sl_retry_res.json()
-                            sl_retry_success = True
-                            print(f"[Binance Futures] Stop Loss placed successfully on attempt {attempt+1}.")
-                            break
-                        else:
-                            print(f"[Binance Futures] Retry attempt {attempt+1} failed: {sl_retry_res.text}")
-                    except Exception as e:
-                        print(f"[Binance Futures] Retry attempt {attempt+1} failed with exception: {e}")
-                    
-                    backoff_delay *= 2
-                    
-                if not sl_retry_success:
-                    # CRITICAL FAILSAFE: If Stop Loss order fails, we MUST immediately market close the main position!
-                    msg = f"CRITICAL: Failed to place Stop Loss for {symbol_usdt} after retries. Emergency closing position immediately..."
-                    print(f"[Binance Futures] {msg}")
-                    # Await Telegram Alert directly for critical failsafe
-                    await send_telegram_alert(f"🚨 {msg}")
-                    
-                    close_timestamp = int(time.time() * 1000)
-                    close_query = (
-                        f"symbol={symbol_usdt}&side={opposite_side}&positionSide={position_side}&"
-                        f"type=MARKET&quantity={quantity}&timestamp={close_timestamp}"
-                    )
-                    close_signature = generate_signature(close_query, api_secret)
-                    close_payload = f"{close_query}&signature={close_signature}"
-                    
-                    close_res = await client.post(f"{FUTURES_BASE_URL}/fapi/v1/order", headers=headers, content=close_payload, timeout=10.0)
-                    if close_res.status_code != 200:
-                        critical_msg = f"FATAL: Emergency close failed for {symbol_usdt}! Position is open without Stop Loss. Manual intervention required immediately!"
-                        print(f"[Binance Futures] {critical_msg} Error: {close_res.text}")
-                        # Lock the bot immediately on fatal failure
-                        await lock_bot()
-                        # Await Telegram Alert directly for fatal failsafe
-                        await send_telegram_alert(f"🚨🚨🚨 {critical_msg}\nError: {close_res.text}")
-                    
-                    return {
-                        "status": "error",
-                        "message": f"CRITICAL: Failed to place Stop Loss bracket. Position was emergency closed to prevent unprotected risk."
-                    }
-
-            # Inspect Take Profit Order (non-critical, warn if failed)
-            if tp_price and tp_order_data:
-                if "code" in tp_order_data:
-                    print(f"[Binance Futures] Failed to place Take Profit: {tp_order_data.get('msg')}")
-                else:
-                    results["take_profit"] = tp_order_data
-
-            # Update daily stats with a placeholder fee/slippage for now
-            # Only update stats if the order was successfully executed on Binance
-            async with db_lock:
-                await update_daily_stats(-0.10)
-
+        if ticker_price <= 0:
             return {
-                "status": "success",
-                "message": "Futures order executed successfully with SL/TP brackets.",
-                "data": results
+                "status": "error",
+                "message": f"Failed to fetch market price for {symbol_formatted}. Cannot calculate safety thresholds."
             }
+
+        opposite_side = "SELL" if side == "BUY" else "BUY"
+        
+        # Calculate estimated SL price
+        sl_price = ticker_price * (1 - stop_loss_pct / 100.0) if side == "BUY" else ticker_price * (1 + stop_loss_pct / 100.0)
+        sl_price = round(sl_price, 4 if symbol == "XRP" else 2)
+        
+        # Calculate estimated TP price (if requested)
+        tp_price = None
+        if take_profit_pct:
+            tp_price = ticker_price * (1 + take_profit_pct / 100.0) if side == "BUY" else ticker_price * (1 - take_profit_pct / 100.0)
+            tp_price = round(tp_price, 4 if symbol == "XRP" else 2)
+
+        # Construct batchOrders JSON list in ccxt / binance format
+        # CCXT uses create_orders or fetch_private/public for batchOrders.
+        # To maintain the exact atomic batchOrders call structure safely:
+        batch_orders_payload = [
+            {
+                "symbol": symbol_formatted,
+                "side": side.upper(),
+                "positionSide": position_side.upper(),
+                "type": order_type.upper(),
+                "quantity": str(quantity)
+            },
+            {
+                "symbol": symbol_formatted,
+                "side": opposite_side.upper(),
+                "positionSide": position_side.upper(),
+                "type": "STOP_MARKET",
+                "stopPrice": str(sl_price),
+                "closePosition": "true"
+            }
+        ]
+        
+        if tp_price:
+            batch_orders_payload.append({
+                "symbol": symbol_formatted,
+                "side": opposite_side.upper(),
+                "positionSide": position_side.upper(),
+                "type": "TAKE_PROFIT_MARKET",
+                "stopPrice": str(tp_price),
+                "closePosition": "true"
+            })
+
+        # 2. Place Atomic Batch Orders using CCXT's custom binanceusdm fapiPrivatePostBatchOrders
+        # CCXT allows sending requests directly to raw endpoints via client.fapiPrivatePostBatchOrders
+        # This keeps the exact atomic API guarantee while letting CCXT handle all auth/timestamp signing!
+        batch_res = await asyncio.to_thread(
+            client.fapiPrivatePostBatchOrders, 
+            {"batchOrders": client.json(batch_orders_payload)}
+        )
+        
+        if not isinstance(batch_res, list) or len(batch_res) < 2:
+            return {
+                "status": "error",
+                "message": f"Unexpected batch order response format from CCXT: {batch_res}"
+            }
+            
+        main_order_data = batch_res[0]
+        sl_order_data = batch_res[1]
+        tp_order_data = batch_res[2] if len(batch_res) > 2 else None
+        
+        # Inspect Main Order
+        # Binance returns code/msg inside batch response if a specific order failed
+        if "code" in main_order_data or "msg" in main_order_data:
+            return {
+                "status": "error",
+                "message": f"Failed to place main order in batch: {main_order_data.get('msg')}"
+            }
+            
+        results["order"] = main_order_data
+        entry_price = float(main_order_data.get("avgPrice", 0.0)) or float(main_order_data.get("price", 0.0))
+        
+        # Inspect Stop Loss Order
+        sl_placed = "code" not in sl_order_data
+        if sl_placed:
+            results["stop_loss"] = sl_order_data
+        else:
+            # 3. Retry Logic & emergency failsafe for Stop Loss if it failed in the batch
+            print(f"[Binance Futures] Stop Loss placement failed in batch: {sl_order_data.get('msg')}. Initializing retry loop...")
+            max_retries = 3
+            backoff_delay = 0.5
+            sl_retry_success = False
+            
+            # Recalculate based on real entry price if possible
+            if entry_price > 0:
+                sl_price = entry_price * (1 - stop_loss_pct / 100.0) if side == "BUY" else entry_price * (1 + stop_loss_pct / 100.0)
+                sl_price = round(sl_price, 4 if symbol == "XRP" else 2)
+            
+            for attempt in range(max_retries):
+                await asyncio.sleep(backoff_delay)
+                print(f"[Binance Futures] Retrying Stop Loss order (Attempt {attempt+1}/{max_retries})...")
+                
+                try:
+                    # Place single order via CCXT fapiPrivatePostOrder
+                    sl_res = await asyncio.to_thread(
+                        client.fapiPrivatePostOrder,
+                        {
+                            "symbol": symbol_formatted,
+                            "side": opposite_side.upper(),
+                            "positionSide": position_side.upper(),
+                            "type": "STOP_MARKET",
+                            "stopPrice": str(sl_price),
+                            "closePosition": "true"
+                        }
+                    )
+                    if sl_res and "code" not in sl_res:
+                        results["stop_loss"] = sl_res
+                        sl_retry_success = True
+                        print(f"[Binance Futures] Stop Loss placed successfully on attempt {attempt+1}.")
+                        break
+                    else:
+                        print(f"[Binance Futures] Retry attempt {attempt+1} failed: {sl_res}")
+                except Exception as e:
+                    print(f"[Binance Futures] Retry attempt {attempt+1} failed with exception: {e}")
+                
+                backoff_delay *= 2
+                
+            if not sl_retry_success:
+                # CRITICAL FAILSAFE: If Stop Loss order fails, we MUST immediately market close the main position!
+                msg = f"CRITICAL: Failed to place Stop Loss for {symbol_formatted} after retries. Emergency closing position immediately..."
+                print(f"[Binance Futures] {msg}")
+                # Await Telegram Alert directly for critical failsafe
+                await send_telegram_alert(f"🚨 {msg}")
+                
+                try:
+                    close_res = await asyncio.to_thread(
+                        client.fapiPrivatePostOrder,
+                        {
+                            "symbol": symbol_formatted,
+                            "side": opposite_side.upper(),
+                            "positionSide": position_side.upper(),
+                            "type": "MARKET",
+                            "quantity": str(quantity)
+                        }
+                    )
+                    if close_res and "code" not in close_res:
+                        print(f"[Binance Futures] Emergency close position executed successfully.")
+                    else:
+                        raise RuntimeError(f"Close order rejected: {close_res}")
+                except Exception as close_err:
+                    critical_msg = f"FATAL: Emergency close failed for {symbol_formatted}! Position is open without Stop Loss. Manual intervention required immediately!"
+                    print(f"[Binance Futures] {critical_msg} Error: {close_err}")
+                    # Lock the bot immediately on fatal failure
+                    await lock_bot()
+                    # Await Telegram Alert directly for fatal failsafe
+                    await send_telegram_alert(f"🚨🚨🚨 {critical_msg}\nError: {close_err}")
+                
+                return {
+                    "status": "error",
+                    "message": f"CRITICAL: Failed to place Stop Loss bracket. Position was emergency closed to prevent unprotected risk."
+                }
+
+        # Inspect Take Profit Order (non-critical, warn if failed)
+        if tp_price and tp_order_data:
+            if "code" in tp_order_data:
+                print(f"[Binance Futures] Failed to place Take Profit: {tp_order_data.get('msg')}")
+            else:
+                results["take_profit"] = tp_order_data
+
+        # Update daily stats with a placeholder fee/slippage for now
+        # Only update stats if the order was successfully executed on Binance
+        async with db_lock:
+            await update_daily_stats(-0.10)
+
+        return {
+            "status": "success",
+            "message": "Futures order executed successfully with SL/TP brackets.",
+            "data": results
+        }
     except Exception as e:
         return {
             "status": "error",

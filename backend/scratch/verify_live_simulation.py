@@ -6,7 +6,9 @@ import os
 # Adjust path to import backend modules
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..')))
 
-from backend.main import trigger_automated_trade_sim, monitor_simulated_positions_loop, get_asset_current_price
+from backend.trading.simulator import trigger_automated_trade_sim
+from backend.trading.monitor import monitor_simulated_positions_loop
+from backend.helpers.utils import get_asset_current_price
 from backend.database import read_database, write_database, load_ai_config
 
 async def main():

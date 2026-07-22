@@ -31,4 +31,4 @@ else
     PYTHON_EXEC="/media/sun/DATA/PythonEnv/ComfyUI/venv/bin/python"
 fi
 
-$PYTHON_EXEC -m backend.main
+PYTHONPATH="" $PYTHON_EXEC -m backend.main
