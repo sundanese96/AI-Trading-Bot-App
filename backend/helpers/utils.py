@@ -79,6 +79,9 @@ processed_headlines = set()
 
 def mark_headline_processed(headline: str):
     if headline:
+        if len(processed_headlines) >= 1000:
+            # Remove an arbitrary item to keep set size bounded
+            processed_headlines.pop()
         processed_headlines.add(headline.strip().lower())
 
 def is_headline_processed(headline: str) -> bool:

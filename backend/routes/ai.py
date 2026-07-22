@@ -491,10 +491,11 @@ Gunakan data real-time, volatilitas pasar, sentimen berita, indeks Fear & Greed,
         meta_approved = True
         meta_evaluated = False
 
-        if llm_decision in ["LONG", "SHORT"]:
-            strategy_name = bot_settings.get("strategy", "CONSERVATIVE").upper()
-            bypass_veto = strategy_name in ["AGGRESSIVE", "SCALPING", "HEDGING"]
+        # Initialize bypass_veto default for scope safety in nested blocks
+        strategy_name = bot_settings.get("strategy", "CONSERVATIVE").upper()
+        bypass_veto = strategy_name in ["AGGRESSIVE", "SCALPING", "HEDGING"]
 
+        if llm_decision in ["LONG", "SHORT"]:
             if target_asset not in crypto_assets:
                 logger.info(f"[Veto Gate] Asset {target_asset} not supported by ML pipeline")
                 veto_active = True
@@ -588,6 +589,44 @@ Gunakan data real-time, volatilitas pasar, sentimen berita, indeks Fear & Greed,
             "metaApproved": meta_approved,
             "metaModelEvaluated": meta_evaluated
         }
+
+        # Add Markov Regime Gate check (In addition to existing OOD/ML checks)
+        try:
+            # Import HMM tools from services
+            from backend.services.markov_regime import get_cached_markov_analysis
+            
+            # Fetch daily candles & run Markov analysis with non-blocking 1-hour cache
+            target_ticker = f"{target_asset}-USD"
+            markov_res = await get_cached_markov_analysis(target_ticker, years=5, window=20, threshold=0.05, min_train=252, hmm=False)
+            
+            current_regime = markov_res.get("current_regime", "Sideways")
+            stationary_bear = markov_res.get("stationary_distribution", {}).get("bear", 0.0)
+            markov_signal = markov_res.get("signal", 0.0)
+            
+            # If Bear or Sideways with >= 70% stationary probability or current state is Bear, veto directional trades
+            # 70% threshold is conservative. Note: Bear regime state is highly persistence (Diagonal state P[0,0] is sticky).
+            markov_threshold = 0.70
+            
+            parsed_analysis["vetoGate"]["markovRegime"] = current_regime
+            parsed_analysis["vetoGate"]["markovConfidence"] = float(stationary_bear)
+            
+            # Check conditions for gating
+            is_markov_bearish = current_regime == "Bear" or stationary_bear >= markov_threshold
+            if is_markov_bearish and llm_decision in ["LONG", "SHORT"] and not bypass_veto:
+                veto_active = True
+                veto_reason = f"Markov Regime Gate Active (Regime: {current_regime}, Bear probability: {stationary_bear:.2%}) - conservative HOLD triggered."
+                
+                # Force override decision to HOLD
+                ai_decision["decision"] = "HOLD"
+                parsed_analysis["tradeDecision"] = ai_decision
+                parsed_analysis["vetoGate"]["vetoActive"] = veto_active
+                parsed_analysis["vetoGate"]["vetoReason"] = veto_reason
+                logger.info(f"[Markov Gate] Overriding LLM decision to HOLD out of caution: {veto_reason}")
+        except Exception as markov_err:
+            logger.error(f"[Markov Gate] Error running Markov regime validation: {markov_err}")
+            # Do not force lock on markov error to degrade gracefully, but log it
+            parsed_analysis["vetoGate"]["markovRegime"] = "Error"
+            parsed_analysis["vetoGate"]["markovConfidence"] = 0.0
 
         is_geopolitical = bool(parsed_analysis.get("isGeopolitical"))
         is_macro = bool(parsed_analysis.get("isMacro"))

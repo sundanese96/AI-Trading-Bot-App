@@ -537,6 +537,24 @@ Kembalikan response dalam format JSON yang valid dan bersih dengan struktur pers
             veto_active = True
             veto_reason = f"ML error: {str(ml_err)}"
             
+    # Add Markov Regime Gate check for backtesting dry-run endpoint (matching routes/ai.py implementation)
+    markov_regime_val = "Sideways"
+    markov_confidence_val = 0.0
+    try:
+        from backend.services.markov_regime import get_cached_markov_analysis
+        target_ticker = f"{target_asset}-USD"
+        markov_res = await get_cached_markov_analysis(target_ticker, years=5, window=20, threshold=0.05, min_train=252, hmm=False)
+        
+        markov_regime_val = markov_res.get("current_regime", "Sideways")
+        markov_confidence_val = float(markov_res.get("stationary_distribution", {}).get("bear", 0.0))
+        
+        is_markov_bearish = markov_regime_val == "Bear" or markov_confidence_val >= 0.70
+        if is_markov_bearish and llm_decision in ["LONG", "SHORT"]:
+            veto_active = True
+            veto_reason = f"Markov Regime Gate Active (Regime: {markov_regime_val}, Bear probability: {markov_confidence_val:.2%}) - conservative HOLD triggered."
+    except Exception as markov_err:
+        logger.error(f"[Markov Backtest Gate] Error: {markov_err}")
+
     final_decision = "HOLD" if veto_active else llm_decision
     
     kelly_pct = 0.0
@@ -641,7 +659,9 @@ Kembalikan response dalam format JSON yang valid dan bersih dengan struktur pers
             "mlConfidence": ml_confidence,
             "metaPWin": meta_p_win,
             "metaApproved": meta_approved,
-            "metaModelEvaluated": meta_evaluated
+            "metaModelEvaluated": meta_evaluated,
+            "markovRegime": markov_regime_val,
+            "markovConfidence": markov_confidence_val
         },
         "finalDecision": final_decision,
         "kellyPositionSize": round(kelly_pct, 2),
