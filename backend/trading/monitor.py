@@ -96,7 +96,7 @@ async def monitor_simulated_positions_loop():
                             # Also close matching trade in Sentix db.json
                             try:
                                 from backend.sentix_adapter import close_active_position_by_timestamp
-                                await close_active_position_by_timestamp(trade.get("timestamp"), cur_price, close_reason)
+                                await close_active_position_by_timestamp(trade.get("timestamp"), cur_price, symbol, close_reason)
                             except Exception as sentix_err:
                                 logger.error(f"[Sim Position Monitor] Error closing Sentix trade: {sentix_err}")
                             

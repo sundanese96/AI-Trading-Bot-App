@@ -266,18 +266,25 @@ async def close_active_position(trade_id: str, exit_price: float = None) -> Dict
         
     return {"success": True, "message": "Posisi berhasil ditutup.", "trades": sentix_state["trades"]}
 
-async def close_active_position_by_timestamp(timestamp: int, exit_price: float, reason: str = "AUTO") -> bool:
+async def close_active_position_by_timestamp(timestamp: int, exit_price: float, symbol: str, reason: str = "AUTO") -> bool:
     """
-    Closes an active position in Sentix (db.json) matching the given timestamp (fuzzy matched).
+    Closes an active position in Sentix (db.json) matching both the given timestamp and symbol.
     """
-    
-    # Try exact match first
-    trade = next((t for t in sentix_state["trades"] if t["status"] == "OPEN" and t.get("timestamp") == timestamp), None)
+    symbol_usdt = symbol.upper()
+    if not symbol_usdt.endswith("USDT"):
+        symbol_usdt = f"{symbol_usdt}USDT"
+
+    # Try exact match first on timestamp AND symbol
+    trade = next((t for t in sentix_state["trades"] if t["status"] == "OPEN" and t.get("timestamp") == timestamp and t.get("symbol") == symbol_usdt), None)
     
     if not trade:
-        # Fuzzy match within 10 seconds (10,000 milliseconds)
-        trade = next((t for t in sentix_state["trades"] if t["status"] == "OPEN" and abs(t.get("timestamp", 0) - timestamp) < 10000), None)
+        # Fuzzy match within 10 seconds AND must match the same symbol exactly
+        trade = next((t for t in sentix_state["trades"] if t["status"] == "OPEN" and abs(t.get("timestamp", 0) - timestamp) < 10000 and t.get("symbol") == symbol_usdt), None)
         
+    if not trade:
+        # Final fallback: just match open position by symbol if timestamp match fails
+        trade = next((t for t in sentix_state["trades"] if t["status"] == "OPEN" and t.get("symbol") == symbol_usdt), None)
+
     if not trade:
         return False
         
