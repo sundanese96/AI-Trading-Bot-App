@@ -704,8 +704,14 @@ async def train_ml_model(request: Request):
             r2_score = round(0.58 + random.uniform(0.02, 0.14), 4)
             last_r2 = r2_score
 
-            model_name = f"Latih Mandiri {model_type.upper()} ({symbol} - {timeframe_minutes}m)"
-            model_id = f"model-{model_type}-{symbol.lower()}-{timeframe_minutes}m"
+            # Standardize naming: memecoins/altcoins are recorded under GLOBAL in UI state to match file prefix fallbacks
+            sym_clean = symbol.upper().replace("USDT", "")
+            ui_symbol = symbol
+            if sym_clean not in ["BTC", "ETH", "SOL", "BNB"]:
+                ui_symbol = "GLOBAL"
+
+            model_name = f"Latih Mandiri {model_type.upper()} ({ui_symbol} - {timeframe_minutes}m)"
+            model_id = f"model-{model_type}-{ui_symbol.lower()}-{timeframe_minutes}m"
             new_model = {
                 "id": model_id,
                 "name": model_name,
