@@ -21,61 +21,73 @@ ASSETS = {
 
 def audit_consistency():
     summary_results = []
+    timeframes = [5, 15, 60, 180]
     
-    for name, filename in ASSETS.items():
-        filepath = FEATHER_DIR / filename
-        if not filepath.exists():
-            print(f"[WARN] File {filepath} not found. Skipping.")
-            continue
+    for tf in timeframes:
+        print(f"\n======================================== TIMEFRAME: {tf}m ========================================")
+        for name, filename in ASSETS.items():
+            filepath = FEATHER_DIR / filename
+            if not filepath.exists():
+                continue
+                
+            print(f"\nEvaluating {tf}m on asset: {name}")
             
-        print(f"\nEvaluating consistency on asset: {name} ({filename})")
-        
-        # Test on 15m (reasonable sample size, less noisy than 5m, more data than 60m)
-        for m_type in ["xgboost", "lightgbm", "catboost"]:
-            try:
-                metrics = train_model(
-                    file_path=str(filepath),
-                    num_rounds=100,
-                    model_type=m_type,
-                    resample_minutes=15,
-                    symbol=name,
-                    use_binary_mode=True,
-                    tp_multiplier=2.0,
-                    sl_multiplier=1.0,
-                    max_holding=15
-                )
-                
-                acc = metrics.get("test", {}).get("accuracy", 0.0)
-                f1 = metrics.get("test", {}).get("f1", 0.0)
-                pnl = metrics.get("backtest_pnl", 0.0)
-                
-                summary_results.append({
-                    "Asset": name,
-                    "Model": m_type.upper(),
-                    "Accuracy": acc,
-                    "F1": f1,
-                    "PnL": pnl
-                })
-                print(f"  [{m_type.upper()}] Accuracy: {acc:.4f} | F1: {f1:.4f} | PnL: {pnl:.2f}%")
-            except Exception as e:
-                print(f"  [{m_type.upper()}] Error: {e}")
+            for m_type in ["xgboost", "lightgbm", "catboost"]:
+                try:
+                    metrics = train_model(
+                        file_path=str(filepath),
+                        num_rounds=100,
+                        model_type=m_type,
+                        resample_minutes=tf,
+                        symbol=name,
+                        use_binary_mode=True,
+                        tp_multiplier=2.0,
+                        sl_multiplier=1.0,
+                        max_holding=15
+                    )
+                    
+                    acc = metrics.get("test", {}).get("accuracy", 0.0)
+                    f1 = metrics.get("test", {}).get("f1", 0.0)
+                    pnl = metrics.get("backtest_pnl", 0.0)
+                    
+                    summary_results.append({
+                        "Timeframe": tf,
+                        "Asset": name,
+                        "Model": m_type.upper(),
+                        "Accuracy": acc,
+                        "F1": f1,
+                        "PnL": pnl
+                    })
+                    print(f"  [{m_type.upper()}] Acc: {acc:.4f} | F1: {f1:.4f} | PnL: {pnl:.2f}%")
+                except Exception as e:
+                    print(f"  [{m_type.upper()}] Error: {e}")
                 
     # Compile Summary Dataframe
     df_res = pd.DataFrame(summary_results)
     print("\n" + "="*80)
-    print("                      CROSS-ASSET CONSISTENCY REPORT (15m)")
+    print("                      CROSS-ASSET CONSISTENCY REPORT (ALL TIMEFRAMES)")
     print("="*80)
     print(df_res.to_string(index=False))
     
     print("\n" + "="*80)
-    print("                      AVERAGE MODEL PERFORMANCE")
+    print("                      AVERAGE MODEL PERFORMANCE BY TIMEFRAME")
     print("="*80)
-    grouped = df_res.groupby("Model").agg({
+    grouped = df_res.groupby(["Timeframe", "Model"]).agg({
         "Accuracy": ["mean", "std"],
         "F1": ["mean", "std"],
         "PnL": ["mean"]
     })
     print(grouped)
+    
+    print("\n" + "="*80)
+    print("                      GLOBAL AVERAGE MODEL PERFORMANCE")
+    print("="*80)
+    global_grouped = df_res.groupby("Model").agg({
+        "Accuracy": ["mean", "std"],
+        "F1": ["mean", "std"],
+        "PnL": ["mean"]
+    })
+    print(global_grouped)
     print("="*80)
 
 if __name__ == "__main__":

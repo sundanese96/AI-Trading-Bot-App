@@ -565,17 +565,19 @@ Gunakan data real-time, volatilitas pasar, sentimen berita, indeks Fear & Greed,
                         max_w = max(llm_weight, ml_weight) if max(llm_weight, ml_weight) > 0 else 1.0
                         fused_confidence_pct = int(min(100, abs(fusion_score) * 100 * (1.0 / max_w)))
                         
+                        # Merge logic and confidence score even if bypass_veto is True
+                        # (This ensures the UI and backtester receive the dynamic, fused decision and confidence)
+                        ai_decision["decision"] = final_decision
+                        ai_decision["confidence"] = fused_confidence_pct
+                        parsed_analysis["tradeDecision"] = ai_decision
+                        
                         if not bypass_veto:
                             if final_decision != llm_decision:
                                 logger.info(f"[Decision Fusion] Overriding LLM {llm_decision} -> {final_decision} (Score: {fusion_score:.2f})")
                                 veto_active = True
                                 veto_reason = f"Decision Fusion resolved to {final_decision} (Score: {fusion_score:.2f})"
-                            
-                            ai_decision["decision"] = final_decision
-                            ai_decision["confidence"] = fused_confidence_pct
-                            parsed_analysis["tradeDecision"] = ai_decision
                         else:
-                            logger.info(f"[Decision Fusion] Strategy is {strategy_name} — bypassing fusion override.")
+                            logger.info(f"[Decision Fusion] Strategy is {strategy_name} — bypassing veto block but applying fused parameters.")
                 except Exception as ml_err:
                     logger.error(f"[Veto Gate] Error running ML confirmation/veto gate: {ml_err}.")
                     veto_active = True
