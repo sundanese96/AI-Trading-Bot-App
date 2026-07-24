@@ -545,7 +545,6 @@ const handleGetAIForecast = async () => {
             savedModels.forEach((model) => {
               let groupName = "PRE-TRAINED GLOBAL";
               
-              // Extract target symbol name if present (e.g. (SOLUSDT) or (BTCUSDT))
               const nameLower = model.name.toLowerCase();
               if (nameLower.includes("btc")) {
                 groupName = "BITCOIN (BTC)";
@@ -563,6 +562,17 @@ const handleGetAIForecast = async () => {
                 groupName = "SUI COIN (SUI)";
               } else if (nameLower.includes("doge")) {
                 groupName = "DOGECOIN (DOGE)";
+              } else {
+                // If it is a global pre-trained model, group by its interval timeframes
+                if (nameLower.includes("(1m)")) {
+                  groupName = "PRE-TRAINED GLOBAL (1 MENIT)";
+                } else if (nameLower.includes("(5m)")) {
+                  groupName = "PRE-TRAINED GLOBAL (5 MENIT)";
+                } else if (nameLower.includes("(15m)")) {
+                  groupName = "PRE-TRAINED GLOBAL (15 MENIT)";
+                } else if (nameLower.includes("(60m)")) {
+                  groupName = "PRE-TRAINED GLOBAL (1 JAM)";
+                }
               }
               
               if (!grouped[groupName]) {
