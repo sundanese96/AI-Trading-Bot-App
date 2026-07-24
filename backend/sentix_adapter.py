@@ -690,18 +690,28 @@ async def train_ml_model(request: Request):
         bias = round(random.uniform(-0.1, 0.1), 4)
         r2_score = round(0.58 + random.uniform(0.02, 0.14), 4)
 
-        # Register the trained model in sentix_state so it is listed immediately
-        model_id = f"model-{model_type}-{int(time.time())}"
+        # Register the trained model in sentix_state.
+        # If a model with the same name (type + symbol) already exists, update/overwrite it instead of adding a new card.
+        model_name = f"Latih Mandiri {model_type.upper()} ({symbol})"
+        model_id = f"model-{model_type}-{symbol.lower()}"
         new_model = {
             "id": model_id,
-            "name": f"Latih Mandiri {model_type.upper()} ({symbol})",
+            "name": model_name,
             "trainedAt": int(time.time() * 1000),
             "r2Score": r2_score,
             "features": features
         }
         if "mlModels" not in sentix_state:
             sentix_state["mlModels"] = []
-        sentix_state["mlModels"].insert(0, new_model)
+            
+        # Find index of existing model with the same name to overwrite
+        existing_idx = next((idx for idx, m in enumerate(sentix_state["mlModels"]) if m.get("name") == model_name), None)
+        if existing_idx is not None:
+            sentix_state["mlModels"][existing_idx] = new_model
+            print(f"[Sentix Adapter] Overwrote existing ML model card: {model_name}")
+        else:
+            sentix_state["mlModels"].insert(0, new_model)
+            
         _save_sentix_db()
 
         # Trigger actual Python ML training loop in the background to build the real model
