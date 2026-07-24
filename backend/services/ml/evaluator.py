@@ -33,23 +33,43 @@ def evaluate_model_performance(
     except ImportError:
         pass
         
+    # Handle both binary and multiclass predictions
     if is_lgb:
-        train_preds = model.predict(X_train).argmax(axis=1) - 1
-        val_preds = model.predict(X_val).argmax(axis=1) - 1
-        test_preds = model.predict(X_test).argmax(axis=1) - 1
+        train_raw = model.predict(X_train)
+        val_raw = model.predict(X_val)
+        test_raw = model.predict(X_test)
     elif is_cat:
-        train_preds = model.predict_proba(X_train).argmax(axis=1) - 1
-        val_preds = model.predict_proba(X_val).argmax(axis=1) - 1
-        test_preds = model.predict_proba(X_test).argmax(axis=1) - 1
+        train_raw = model.predict_proba(X_train)
+        val_raw = model.predict_proba(X_val)
+        test_raw = model.predict_proba(X_test)
     else:
         dtrain = xgb.DMatrix(X_train)
         dval = xgb.DMatrix(X_val)
         dtest = xgb.DMatrix(X_test)
+        train_raw = model.predict(dtrain)
+        val_raw = model.predict(dval)
+        test_raw = model.predict(dtest)
         
-        # Predictions
-        train_preds = model.predict(dtrain).argmax(axis=1) - 1
-        val_preds = model.predict(dval).argmax(axis=1) - 1
-        test_preds = model.predict(dtest).argmax(axis=1) - 1
+    # Map predictions back to the original label space
+    # Binary: raw is 1D array of probs (or 2D where column 1 is P(LONG))
+    # Check if raw array is 1D or column 1 is class 1
+    is_binary = train_raw.ndim == 1 or train_raw.shape[1] == 1 or (train_raw.shape[1] == 2 and set(np.unique(y_train)) == {0, 1})
+    
+    if is_binary:
+        # Convert raw scores to binary [0, 1] classes
+        if train_raw.ndim == 2:
+            train_preds = (train_raw[:, 1] >= 0.5).astype(int)
+            val_preds = (val_raw[:, 1] >= 0.5).astype(int)
+            test_preds = (test_raw[:, 1] >= 0.5).astype(int)
+        else:
+            train_preds = (train_raw >= 0.5).astype(int)
+            val_preds = (val_raw >= 0.5).astype(int)
+            test_preds = (test_raw >= 0.5).astype(int)
+    else:
+        # Multiclass [0, 1, 2] -> [-1, 0, 1]
+        train_preds = train_raw.argmax(axis=1) - 1
+        val_preds = val_raw.argmax(axis=1) - 1
+        test_preds = test_raw.argmax(axis=1) - 1
     
     from sklearn.metrics import classification_report
     
@@ -81,12 +101,23 @@ def evaluate_model_performance(
         pred = test_preds[i]
         actual = y_test.iloc[i]
         
-        if pred == 1: # LONG
-            trade_return = (actual * 0.15) - transaction_cost # Simplified return scaling
+        # If binary: pred=0 (SHORT), pred=1 (LONG)
+        # If multiclass: pred=-1 (SHORT), pred=1 (LONG), pred=0 (HOLD)
+        if is_binary:
+            # Map pred 0/1 back to -1/1 for simulation compatibility
+            sim_pred = -1 if pred == 0 else 1
+            # y_test in binary is also 0/1, map actual back to -1/1
+            sim_actual = -1 if actual == 0 else 1
+            
+            trade_return = (sim_pred * sim_actual * 0.15) - transaction_cost
             current_pnl += trade_return
-        elif pred == -1: # SHORT
-            trade_return = (-actual * 0.15) - transaction_cost
-            current_pnl += trade_return
+        else:
+            if pred == 1: # LONG
+                trade_return = (actual * 0.15) - transaction_cost # Simplified return scaling
+                current_pnl += trade_return
+            elif pred == -1: # SHORT
+                trade_return = (-actual * 0.15) - transaction_cost
+                current_pnl += trade_return
             
         equity_curve.append(100.0 + current_pnl)
         

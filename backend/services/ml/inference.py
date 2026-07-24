@@ -196,10 +196,38 @@ def predict_live_with_gate(
     else: # xgboost
         dmatrix = xgb.DMatrix(latest_features)
         probs = model.predict(dmatrix)[0]
-        
-    pred_class_idx = probs.argmax()
-    pred_class = pred_class_idx - 1 # Map [0, 1, 2] back to [-1, 0, 1]
-    confidence = float(probs[pred_class_idx])
+    
+    # Determine if model was trained in binary or multiclass mode
+    # Check model file header or default to binary (V2 standard)
+    is_binary_model = False
+    try:
+        from backend.services.ml.model import get_model_path
+        m_path = get_model_path(model_type, resample_minutes, target_asset)
+        with open(str(m_path), 'r') as _f:
+            _header = _f.readline()
+            if '"objective":"binary"' in _header or '"objective": "binary"' in _header:
+                is_binary_model = True
+    except Exception:
+        pass
+    
+    # Also check lightgbm/catboost model headers
+    if model_type.lower() == "lightgbm" and hasattr(model, "current_config"):
+        try:
+            cfg = model.current_config()
+            if '"objective": "binary"' in str(cfg):
+                is_binary_model = True
+        except Exception:
+            pass
+    
+    if is_binary_model:
+        # Binary mode: 0=SHORT, 1=LONG
+        pred_class = int(probs >= 0.5)  # 0 or 1
+        confidence = float(probs) if pred_class == 1 else float(1 - probs)
+    else:
+        # Multiclass mode: [-1, 0, 1]
+        pred_class_idx = probs.argmax()
+        pred_class = pred_class_idx - 1
+        confidence = float(probs[pred_class_idx])
     
     # 6. Meta-Model Chain (if available and prediction is directional)
     meta_p_win = None

@@ -72,10 +72,13 @@ def calculate_adx(df: pd.DataFrame, period: int = 14) -> pd.Series:
 def extract_features(df: pd.DataFrame) -> pd.DataFrame:
     """
     Extracts technical indicators as features from raw OHLCV data.
-    Now includes funding rates, cross-asset correlation features, and market regime context.
+    Now includes funding rates, cross-asset correlation features, market regime context,
+    AND V2 advanced features (lag returns, FFT, BB zscore).
     """
     features = pd.DataFrame(index=df.index)
+    close = df['close']
     
+    # === ORIGINAL FEATURES (Trend, Volatility, Volume) ===
     # Trend
     features['rsi_14'] = calculate_rsi(df, 14)
     macd_line, signal_line, macd_hist = calculate_macd(df, 12, 26, 9)
@@ -99,6 +102,45 @@ def extract_features(df: pd.DataFrame) -> pd.DataFrame:
     features['cmf_20'] = calculate_cmf(df, 20)
     volume_sma = df['volume'].rolling(window=20).mean()
     features['volume_sma_ratio'] = df['volume'] / (volume_sma + 1e-9)
+    
+    # === V2 ADVANCED FEATURES (Stationarity & Signal Extraction) ===
+    # 1. Autoregressive price returns (Lags) for stationarity
+    features['return_1'] = close.pct_change(1)
+    features['return_2'] = close.pct_change(2)
+    features['return_3'] = close.pct_change(3)
+    features['return_5'] = close.pct_change(5)
+    
+    # 2. Moving average ratios (normalized by price)
+    features['ma10_ratio'] = (close - close.rolling(10).mean()) / (close.rolling(10).mean() + 1e-9)
+    features['ma30_ratio'] = (close - close.rolling(30).mean()) / (close.rolling(30).mean() + 1e-9)
+    
+    # 3. Bollinger Bands Z-score (distance to MA normalized by std deviation)
+    ma20 = close.rolling(20).mean()
+    std20 = close.rolling(20).std()
+    features['bb_zscore'] = (close - ma20) / (std20 + 1e-9)
+    
+    # 4. MACD histogram ratio (normalized by price)
+    features['macd_hist_ratio'] = (macd_hist - signal_line) / (close + 1e-9)
+    
+    # 5. Volume spike indicator
+    vol_sma20 = df['volume'].rolling(20).mean()
+    features['volume_ratio'] = df['volume'] / (vol_sma20 + 1e-9)
+    
+    # 6. Fourier Transform features (DFT frequency components of recent 30 prices)
+    try:
+        close_vals = close.values
+        fft_real_5 = np.zeros(len(df))
+        fft_imag_5 = np.zeros(len(df))
+        for idx in range(30, len(df)):
+            window = close_vals[idx-30:idx]
+            fft_coeffs = np.fft.fft(window)
+            fft_real_5[idx] = np.real(fft_coeffs[2])  # extract low frequency cycle component
+            fft_imag_5[idx] = np.imag(fft_coeffs[2])
+        features['fft_real'] = fft_real_5
+        features['fft_imag'] = fft_imag_5
+    except Exception:
+        features['fft_real'] = 0.0
+        features['fft_imag'] = 0.0
     
     # --- Funding Rates & Cross-Asset Features ---
     # Ensure there is a date column to align on

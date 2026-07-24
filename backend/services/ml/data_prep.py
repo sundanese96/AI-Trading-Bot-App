@@ -6,17 +6,16 @@ from backend.services.ml.features import extract_features
 
 def apply_triple_barrier_labels(
     df: pd.DataFrame,
-    tp_pct: float = 2.5,
-    sl_pct: float = 1.5,
+    tp_multiplier: float = 2.0,
+    sl_multiplier: float = 1.0,
     max_holding: int = 30
 ) -> Tuple[pd.Series, pd.Series]:
     """
-    Triple-Barrier Labeling (Marcos López de Prado methodology).
+    Dynamic Triple-Barrier Labeling (Marcos López de Prado methodology).
     
-    For each candle at index T, scans forward up to max_holding bars using
-    high/low prices to determine which barrier is hit first:
-      - Upper Barrier (TP): high >= entry * (1 + tp_pct/100)  →  direction = +1
-      - Lower Barrier (SL): low  <= entry * (1 - sl_pct/100)  →  direction = -1
+    Uses ATR-based dynamic barriers instead of fixed percentages:
+      - Upper Barrier (TP): entry + (tp_multiplier * ATR)  →  direction = +1
+      - Lower Barrier (SL): entry - (sl_multiplier * ATR)  →  direction = -1
       - Time Barrier (timeout): neither hit within max_holding →  direction =  0
     
     Returns:
@@ -26,6 +25,14 @@ def apply_triple_barrier_labels(
     close = df['close'].values
     high = df['high'].values
     low = df['low'].values
+    
+    # Calculate ATR (True Range)
+    hl = df['high'] - df['low']
+    hc = np.abs(df['high'] - df['close'].shift(1))
+    lc = np.abs(df['low'] - df['close'].shift(1))
+    tr = pd.concat([hl, hc, lc], axis=1).max(axis=1)
+    atr = tr.rolling(window=14).mean().values
+    
     n = len(df)
     
     direction = np.zeros(n, dtype=int)
@@ -33,8 +40,12 @@ def apply_triple_barrier_labels(
     
     for i in range(n - 1):
         entry = close[i]
-        tp_price = entry * (1.0 + tp_pct / 100.0)
-        sl_price = entry * (1.0 - sl_pct / 100.0)
+        curr_atr = atr[i]
+        if np.isnan(curr_atr) or curr_atr <= 0:
+            curr_atr = entry * 0.001  # fallback to 0.1% of price
+            
+        tp_price = entry + (tp_multiplier * curr_atr)
+        sl_price = entry - (sl_multiplier * curr_atr)
         
         end_idx = min(i + max_holding, n - 1)
         
@@ -178,13 +189,13 @@ def prepare_training_data(
 
 def prepare_training_data_v2(
     file_path: str,
-    tp_pct: float = 2.5,
-    sl_pct: float = 1.5,
+    tp_multiplier: float = 2.0,
+    sl_multiplier: float = 1.0,
     max_holding: int = 30,
     resample_minutes: Optional[int] = None
 ) -> Dict:
     """
-    V2 data preparation using Triple-Barrier labeling.
+    V2 data preparation using Dynamic ATR Triple-Barrier labeling.
     
     Returns a dict with:
       - X, y_direction, y_meta: full arrays
@@ -221,9 +232,9 @@ def prepare_training_data_v2(
     # 2. Extract features
     features_df = extract_features(df)
     
-    # 3. Apply Triple-Barrier Labels
-    print(f"[Data Prep V2] Applying Triple-Barrier Labels (TP={tp_pct}%, SL={sl_pct}%, MaxHold={max_holding} bars)...")
-    y_direction, y_meta = apply_triple_barrier_labels(df, tp_pct, sl_pct, max_holding)
+    # 3. Apply Dynamic ATR Triple-Barrier Labels
+    print(f"[Data Prep V2] Applying Dynamic ATR Triple-Barrier (TP={tp_multiplier}*ATR, SL={sl_multiplier}*ATR, MaxHold={max_holding} bars)...\n")
+    y_direction, y_meta = apply_triple_barrier_labels(df, tp_multiplier, sl_multiplier, max_holding)
     
     # 4. Clean NaN/Inf
     features_clean = features_df.replace([np.inf, -np.inf], np.nan)

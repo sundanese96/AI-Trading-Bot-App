@@ -67,33 +67,27 @@ Keys to include in output JSON:
   "timeframeMinutes": 5 or 15 or 60
 }"""
         
-        # Read the latest sensitivity benchmark results from the script execution context
-        # We can dynamically run the benchmark script in a sub-thread or read from file
+        # Read the latest V2 benchmark results (Binary mode + Dynamic ATR Triple-Barrier)
         benchmark_results = "N/A"
         try:
-            from backend.scratch.benchmark_models import FEATHER_PATH
-            from backend.services.ml.data_prep import prepare_training_data
-            from backend.services.ml.model import load_model
-            from backend.services.ml.evaluator import evaluate_model_performance
+            from backend.scratch.train_v2 import train_and_eval_binary_vs_multiclass
+            import subprocess
+            import sys
             
-            benchmark_runs = []
-            if FEATHER_PATH.exists():
-                for tf in [5, 15, 60]:
-                    try:
-                        _, _, train, val, test = prepare_training_data(
-                            str(FEATHER_PATH), target_window=15, threshold_pct=0.15, resample_minutes=tf
-                        )
-                        for m_type in ["xgboost", "lightgbm", "catboost"]:
-                            model = load_model(m_type, resample_minutes=tf, symbol="BTC")
-                            if model is not None:
-                                metrics = evaluate_model_performance(train[0], train[1], val[0], val[1], test[0], test[1], model)
-                                benchmark_runs.append(
-                                    f"- {m_type.upper()} ({tf}m): Acc {metrics['test']['accuracy']:.4f}, F1 {metrics['test']['f1']:.4f}, P&L {metrics['backtest_pnl']:.2f}%"
-                                )
-                    except Exception:
-                        pass
-            if benchmark_runs:
-                benchmark_results = "\n".join(benchmark_runs)
+            # Run the V2 benchmark script and capture output
+            result = subprocess.run(
+                [sys.executable, "-c", """
+import sys
+sys.path.insert(0, '/media/sun/DATA/sentix-ai-crypto-simulator')
+from backend.scratch.train_v2 import train_and_eval_binary_vs_multiclass
+for tf in [5, 15, 60, 180]:
+    train_and_eval_binary_vs_multiclass(tf)
+"""],
+                capture_output=True, text=True, timeout=300
+            )
+            
+            if result.returncode == 0 and "ACCURACY" in result.stdout:
+                benchmark_results = result.stdout
         except Exception as bench_err:
             logger.error(f"[AI Optimizer] Benchmark reading failed: {bench_err}")
             
