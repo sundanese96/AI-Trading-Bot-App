@@ -332,7 +332,7 @@ export default function App() {
     return resData;
   };
 
-// Handler: Local Machine Learning Training
+  // Handler: Local Machine Learning Training
   const handleTrainLocalMLModel = async (params: {
     learningRate: number;
     epochs: number;
@@ -350,7 +350,14 @@ export default function App() {
       throw new Error(data.message || "Gagal melatih model lokal.");
     }
     const resData = await response.json();
-    fetchBackendState(); // sync models list
+    
+    // Explicitly sync and refresh models list from backend to update UI timestamps
+    const mlRes = await fetch("/api/ml/models");
+    if (mlRes.ok) {
+      const mlData = await mlRes.json();
+      setMlModels(mlData.models);
+    }
+    
     return resData.result;
   };
 

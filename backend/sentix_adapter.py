@@ -642,8 +642,11 @@ async def get_ml_models():
                             "features": features
                         })
                         seen_ids.add(model_id)
+                        
+        # Sort pre-trained models below newly trained session models
+        models.sort(key=lambda x: x.get("trainedAt", 0), reverse=True)
     except Exception as e:
-        logger.error(f"[Sentix Adapter] Error scanning pre-trained models: {e}")
+        logger.error(f"[Sentix Adapter] Error loading pre-trained models: {e}")
 
     return {"success": True, "models": models}
 
