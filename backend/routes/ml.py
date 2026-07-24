@@ -14,7 +14,8 @@ async def download_dataset_endpoint(req: DownloadDataRequest):
     try:
         from backend.services.ml.dataset_updater import update_dataset
         if req.symbol == "ALL":
-            symbols = ["BTCUSDT", "ETHUSDT", "SOLUSDT", "BNBUSDT", "XRPUSDT", "ADAUSDT", "DOGEUSDT", "DOTUSDT", "SHIBUSDT", "LTCUSDT", "LINKUSDT", "NEARUSDT", "SUIUSDT"]
+            # Use 1000SHIBUSDT instead of SHIBUSDT as per Binance Futures contract specifications
+            symbols = ["BTCUSDT", "ETHUSDT", "SOLUSDT", "BNBUSDT", "XRPUSDT", "ADAUSDT", "DOGEUSDT", "DOTUSDT", "1000SHIBUSDT", "LTCUSDT", "LINKUSDT", "NEARUSDT", "SUIUSDT"]
             results = []
             for sym in symbols:
                 res = await update_dataset(sym, req.startDate, req.endDate)
