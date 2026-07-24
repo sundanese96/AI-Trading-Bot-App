@@ -1,90 +1,32 @@
-# Dependency directories
-node_modules/
-jspm_packages/
-web_modules/
-
-# Build and distribution artifacts
-dist/
-build/
-out/
-.next/
-.nuxt/
-.cache/
-.parcel-cache/
-.turbo/
-.eslintcache
-.yarn-clean
-
-# Testing and coverage
-coverage/
-.nyc_output/
-.jest/
-.mocha/
-.cypress/
-*.lcov
-
-# Environment and secrets
-.env
-.env.local
-.env.development.local
-.env.test.local
-.env.production.local
-.env*.local
-.enc_key
-
-# OS and system files
-.DS_Store
-Thumbs.db
-desktop.ini
-*.bak
-*.tmp
-*.swp
-*~
-
-# Zip archives and backups
-*.zip
-*.tar.gz
-*.tgz
-*.rar
-backup_old/
-
-# Python compiled files and caches
+# Byte-compiled / optimized / DLL files
 __pycache__/
 *.pyc
 *.pyo
 *.pyd
-.pytest_cache/
-.mypy_cache/
-.ipynb_checkpoints/
-pip-log.txt
-pip-delete-this-directory.txt
 
-# Virtual environments
-.venv/
+# Databases and dynamic state caches
+*.db
+*.sqlite
+database.json
+backend/scraped_cache.json
+
+# Logs
+*.log
+*.pid
+
+# Environments
 venv/
-ENV/
+.venv/
 env/
+.env
 
-# IDE and Editor configs
+# Node
+node_modules/
+dist/
+.eslintcache
+
+# IDEs
 .vscode/
 .idea/
-*.suo
-*.ntvs*
-*.njsproj
-*.sln
-*.sw?
-
-# SQLite/Local databases and dynamic state files
-# (keep db files ignored so they don't overwrite user session state)
-db.json
-database.json
-
-# --- ML MODELS AND OUTPUTS ---
-# Force git to track the trained models and reports inside backend/models
-!backend/models/
-!backend/models/**
-
-# Session tokens and logs
-.session_token
-*.log
-
+*.swp
+*.swo
