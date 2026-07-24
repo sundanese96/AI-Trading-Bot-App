@@ -110,6 +110,10 @@ def read_database():
                 config["confidenceThreshold"] = 75
             if "isLocked" not in config:
                 config["isLocked"] = False
+            if "multiAssetMode" not in config:
+                config["multiAssetMode"] = False
+            if "vetoGateMode" not in config:
+                config["vetoGateMode"] = "AUTO"
             return db
     except Exception as e:
         print(f"[DATABASE] Error reading database.json: {e}")

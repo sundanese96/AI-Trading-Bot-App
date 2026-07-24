@@ -1,7 +1,7 @@
 export interface AiBotSettings {
   enabled: boolean;
   symbol: string;
-  strategy: "SCALPING" | "SWING" | "CONSERVATIVE" | "AGGRESSIVE" | "MARTINGALE" | "HEDGING";
+  strategy: "CONSERVATIVE" | "SCALPING" | "SWING" | "AGGRESSIVE" | "MARTINGALE" | "HEDGING";
   leverage: number;
   llmWeight: number;
   mlWeight: number;
@@ -15,10 +15,11 @@ export interface AiBotSettings {
   riskLevel: "LOW" | "MEDIUM" | "HIGH";
   tpMultiplier: number;
   slMultiplier: number;
-  runIntervalSeconds?: number;
-  isCustom?: boolean;
-  modelType?: string;
-  timeframeMinutes?: number;
+  runIntervalSeconds: number;
+  modelType: string;
+  timeframeMinutes: number;
+  multiAssetMode?: boolean;
+  vetoGateMode?: "ON" | "OFF" | "AUTO";
 }
 
 export const PRESETS = {

@@ -10,6 +10,7 @@ interface Props {
 
 export function BotSettingsForm({ settings, setSettings }: Props) {
   const [isSaving, setIsSaving] = useState(false);
+  const [isOptimizing, setIsOptimizing] = useState(false);
 
   const handleSaveSettings = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -21,6 +22,26 @@ export function BotSettingsForm({ settings, setSettings }: Props) {
       alert(e.message || "Gagal menyimpan konfigurasi.");
     } finally {
       setIsSaving(false);
+    }
+  };
+
+  const handleOptimizeSettings = async () => {
+    setIsOptimizing(true);
+    try {
+      const res = await apiBot.optimizeSettings(settings);
+      if (res.success && res.optimizedSettings) {
+        setSettings((prev) => ({
+          ...prev,
+          ...res.optimizedSettings
+        }));
+        alert(res.message || "AI berhasil mengoptimalkan parameter taktis Anda!");
+      } else {
+        alert("Gagal mengoptimalkan: " + (res.message || "Unknown error"));
+      }
+    } catch (e: any) {
+      alert(e.message || "Gagal berkonsultasi dengan AI Optimizer.");
+    } finally {
+      setIsOptimizing(false);
     }
   };
 
@@ -79,22 +100,53 @@ export function BotSettingsForm({ settings, setSettings }: Props) {
               );
             })}
           </div>
+          
+          {/* AI Parameter Optimizer Trigger Button */}
+          <div className="pt-2 flex justify-end">
+            <button
+              type="button"
+              onClick={handleOptimizeSettings}
+              disabled={isOptimizing}
+              className="flex items-center gap-1.5 px-4 py-2.5 rounded-xl border border-indigo-500/30 hover:border-indigo-400 bg-slate-950 text-indigo-400 hover:text-indigo-300 text-[10px] font-bold font-mono active:scale-95 transition cursor-pointer disabled:opacity-50"
+            >
+              <Cpu className={`h-3.5 w-3.5 ${isOptimizing ? "animate-spin" : ""}`} />
+              <span>{isOptimizing ? "BERKONSULTASI DENGAN AI OPTIMIZER..." : "KONSULTASI PARAMETER TAKTIS (AI OPTIMIZE)"}</span>
+            </button>
+          </div>
         </div>
 
         {/* Target & Model Binding Grid */}
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           <div className="space-y-1.5">
             <label className="text-slate-400 font-mono">KOIN TARGET AKTIF</label>
-            <select
-              value={settings.symbol}
-              onChange={(e) => setSettings((prev) => ({ ...prev, symbol: e.target.value }))}
-              className="w-full bg-slate-950 border border-slate-800 focus:border-indigo-500 rounded-xl px-3 py-2.5 outline-none font-mono font-bold text-white"
-            >
-              {["BTCUSDT", "ETHUSDT", "SOLUSDT", "BNBUSDT", "XRPUSDT", "ADAUSDT", "SUIUSDT", "DOGEUSDT"].map((c) => (
-                <option key={c} value={c}>{c.replace("USDT", "")} / USDT</option>
-              ))}
-            </select>
-            <p className="text-[10px] text-slate-500">Mata uang kripto yang akan diperdagangkan otonom.</p>
+            <div className="flex gap-2">
+              <select
+                value={settings.symbol}
+                onChange={(e) => setSettings((prev) => ({ ...prev, symbol: e.target.value }))}
+                disabled={settings.multiAssetMode}
+                className="w-full bg-slate-950 border border-slate-800 focus:border-indigo-500 rounded-xl px-3 py-2.5 outline-none font-mono font-bold text-white disabled:opacity-40 disabled:cursor-not-allowed"
+              >
+                {["BTCUSDT", "ETHUSDT", "SOLUSDT", "BNBUSDT", "XRPUSDT", "ADAUSDT", "SUIUSDT", "DOGEUSDT"].map((c) => (
+                  <option key={c} value={c}>{c.replace("USDT", "")} / USDT</option>
+                ))}
+              </select>
+              <button
+                type="button"
+                onClick={() => setSettings((prev) => ({ ...prev, multiAssetMode: !prev.multiAssetMode }))}
+                className={`px-4 py-2.5 rounded-xl border text-[10px] font-mono font-bold uppercase transition ${
+                  settings.multiAssetMode
+                    ? "bg-indigo-600 border-indigo-500 text-white"
+                    : "bg-slate-950 border-slate-800 text-slate-400 hover:border-slate-700"
+                }`}
+              >
+                {settings.multiAssetMode ? "Multi 🛡️" : "Single 👤"}
+              </button>
+            </div>
+            <p className="text-[10px] text-slate-500">
+              {settings.multiAssetMode 
+                ? "Mode Multi-Asset Aktif: Bot memindai & men-trade seluruh 8 koin utama sekaligus menggunakan filter BTC Shield." 
+                : "Mode Single-Asset Aktif: Hanya menargetkan 1 koin yang dipilih."}
+            </p>
           </div>
 
           <div className="space-y-1.5">
@@ -112,6 +164,40 @@ export function BotSettingsForm({ settings, setSettings }: Props) {
               <option value="HEDGING">🔒 HEDGING (Posisi Dua Arah | Veto Gate: BYPASS)</option>
             </select>
             <p className="text-[10px] text-slate-500">Menentukan regulasi manajemen risiko otomatis sistem.</p>
+          </div>
+        </div>
+
+        {/* Veto Gate Master Override Selector */}
+        <div className="bg-slate-950/40 p-4 rounded-xl border border-slate-850 space-y-3">
+          <div className="flex justify-between items-center border-b border-slate-850 pb-2">
+            <span className="font-mono text-slate-200 font-bold flex items-center gap-1.5">
+              <ShieldAlert className="h-4 w-4 text-indigo-400" />
+              MASTER OVERRIDE VETO GATE (PROTEKSI AUTO-LIMIT)
+            </span>
+          </div>
+          <div className="grid grid-cols-3 gap-2">
+            {[
+              { id: "ON", label: "🔒 FORCE ON", desc: "Veto gate selalu aktif untuk semua strategi" },
+              { id: "OFF", label: "🔓 FORCE OFF", desc: "Bypass veto gate total (Langsung Eksekusi)" },
+              { id: "AUTO", label: "🧠 SMART / AUTO", desc: "Sesuai default behavior strategi bot" }
+            ].map((m) => {
+              const isSelected = (settings.vetoGateMode || "AUTO") === m.id;
+              return (
+                <button
+                  key={m.id}
+                  type="button"
+                  onClick={() => setSettings((prev) => ({ ...prev, vetoGateMode: m.id as any }))}
+                  className={`text-left p-3 rounded-xl border transition-all flex flex-col justify-between ${
+                    isSelected
+                      ? "bg-indigo-500/10 border-indigo-500 text-white shadow-lg shadow-indigo-500/5"
+                      : "bg-slate-950 border-slate-850 text-slate-400 hover:text-slate-200 hover:border-slate-700 cursor-pointer"
+                  }`}
+                >
+                  <span className="font-sans font-bold text-xs">{m.label}</span>
+                  <span className="text-[9px] text-slate-500 mt-1 leading-tight">{m.desc}</span>
+                </button>
+              );
+            })}
           </div>
         </div>
 

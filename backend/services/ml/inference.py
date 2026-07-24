@@ -200,6 +200,15 @@ def predict_live_with_gate(
     meta_approved = False
     meta_evaluated = False
     
+    # 6.5 SMC (Smart Money Concepts) structure overlay injection
+    smc_res = {}
+    try:
+        from backend.services.smc_detector import detect_smc_structures
+        smc_res = detect_smc_structures(df_latest, window=5)
+        print(f"[SMC Overlay] Detected trend: {smc_res['trend']} | BOS: {smc_res['bos_detected']} | CHoCH: {smc_res['choch_detected']}")
+    except Exception as smc_err:
+        print(f"[SMC Overlay] Failed to compute SMC structures: {smc_err}")
+
     if pred_class != 0:  # Only run meta-model for directional predictions
         try:
             from backend.services.ml.meta_model import load_meta_model, predict_meta
@@ -210,13 +219,34 @@ def predict_live_with_gate(
                 )
                 meta_p_win = p_win_val
                 meta_evaluated = True
+                
+                # Convert SMC trend filter from hard veto to soft probability adjustment
+                # If SMC trend opposes prediction, we scale down meta probability of win by 15% (soft scaling)
+                # This prevents complete trade blocks while reflecting structure divergence.
+                if pred_class == 1 and "bearish" in smc_res.get("trend", "").lower():
+                    if meta_p_win is not None:
+                        meta_p_win = max(0.0, meta_p_win * 0.85)
+                    print(f"[SMC Soft Guard] Scaled down Bullish P(win) due to bearish SMC trend to {meta_p_win:.4f}")
+                elif pred_class == -1 and "bullish" in smc_res.get("trend", "").lower():
+                    if meta_p_win is not None:
+                        meta_p_win = max(0.0, meta_p_win * 0.85)
+                    print(f"[SMC Soft Guard] Scaled down Bearish P(win) due to bullish SMC trend to {meta_p_win:.4f}")
+                    
                 print(f"[Inference] Meta-model: P(win)={meta_p_win:.4f}, Approved={meta_approved}")
             else:
                 # No meta-model available — approve by default (backwards compatible)
                 meta_approved = True
-                print("[Inference] No meta-model found, approving by default.")
+                # If no meta-model, we simulate meta_p_win = 0.50 and apply soft adjustment
+                sim_p_win = 0.50
+                if pred_class == 1 and "bearish" in smc_res.get("trend", "").lower():
+                    sim_p_win *= 0.85
+                    print(f"[SMC Soft Guard] Scaled down default P(win) due to bearish SMC trend to {sim_p_win:.4f}")
+                elif pred_class == -1 and "bullish" in smc_res.get("trend", "").lower():
+                    sim_p_win *= 0.85
+                    print(f"[SMC Soft Guard] Scaled down default P(win) due to bullish SMC trend to {sim_p_win:.4f}")
+                meta_p_win = sim_p_win
+                print("[Inference] No meta-model found, approving by default with soft SMC adjust.")
         except Exception as e:
             print(f"[Inference] Meta-model error: {e}. Approving by default.")
-            meta_approved = True
-    
-    return int(pred_class), confidence, is_ood, ood_violations, meta_p_win, meta_approved, meta_evaluated
+            
+    return pred_class, confidence, is_ood, ood_violations, meta_p_win, meta_approved, meta_evaluated

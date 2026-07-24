@@ -491,9 +491,19 @@ Gunakan data real-time, volatilitas pasar, sentimen berita, indeks Fear & Greed,
         meta_approved = True
         meta_evaluated = False
 
-        # Initialize bypass_veto default for scope safety in nested blocks
         strategy_name = bot_settings.get("strategy", "CONSERVATIVE").upper()
-        bypass_veto = strategy_name in ["AGGRESSIVE", "SCALPING", "HEDGING"]
+        
+        # Determine Veto bypass logic based on central vetoGateMode setting
+        # "ON" = Always enforce Veto checks regardless of strategy
+        # "OFF" = Bypass Veto checks completely for all strategies
+        # "AUTO" = Original smart behavior (bypass only on aggressive/scalping/hedging)
+        veto_mode = bot_settings.get("vetoGateMode", "AUTO").upper()
+        if veto_mode == "ON":
+            bypass_veto = False
+        elif veto_mode == "OFF":
+            bypass_veto = True
+        else: # AUTO
+            bypass_veto = strategy_name in ["AGGRESSIVE", "SCALPING", "HEDGING"]
 
         if llm_decision in ["LONG", "SHORT"]:
             if target_asset not in crypto_assets:

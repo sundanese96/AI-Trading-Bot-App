@@ -504,6 +504,17 @@ Kembalikan response dalam format JSON yang valid dan bersih dengan struktur pers
     meta_approved = True
     meta_evaluated = False
     
+    # Determine Veto bypass logic based on central vetoGateMode setting
+    veto_mode = config.get("vetoGateMode", "AUTO").upper()
+    if veto_mode == "ON":
+        bypass_veto = False
+    elif veto_mode == "OFF":
+        bypass_veto = True
+    else: # AUTO
+        # Check strategy from trade_decision safe access
+        strat_val = str(trade_decision.get("strategy") or "CONSERVATIVE").upper()
+        bypass_veto = strat_val in ["AGGRESSIVE", "SCALPING", "HEDGING"]
+
     if llm_decision in ["LONG", "SHORT"] and target_asset not in crypto_assets:
         logger.info(f"[Veto Gate Dry Run] Asset {target_asset} not supported by ML pipeline — forcing HOLD for safety")
         veto_active = True

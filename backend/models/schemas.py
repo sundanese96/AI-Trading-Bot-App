@@ -42,6 +42,8 @@ class SaveAIConfigRequest(BaseModel):
     mlTargetWindow: Optional[int] = 15
     mlThresholdPct: Optional[float] = 0.15
     mlModelType: Optional[str] = "xgboost"
+    multiAssetMode: Optional[bool] = False
+    vetoGateMode: Optional[str] = "AUTO"
 
 class ExecuteOrderRequest(BaseModel):
     symbol: str

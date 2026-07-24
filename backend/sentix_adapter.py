@@ -32,7 +32,8 @@ sentix_state = {
         "stopLossPct": 1.5, "takeProfitPct": 3.0, "trailingStopPct": 0.5,
         "allocationPerTrade": 1000, "mlModelId": "", "sentimentThreshold": 0.15,
         "riskLevel": "MEDIUM", "tpMultiplier": 1.0, "slMultiplier": 1.0,
-        "runIntervalSeconds": 60, "activatedAt": 0
+        "runIntervalSeconds": 60, "activatedAt": 0, "multiAssetMode": False,
+        "vetoGateMode": "AUTO"
     },
     "aiBotLogs": [],
     "notificationLogs": [],
@@ -325,7 +326,8 @@ async def get_news():
             sent_result = analyze_sentiment(headline)
             raw_score = sent_result["score"]
             # Normalize AFINN raw score to -1..+1 range (AFINN max per word ~4, typical headline ~10-20 words)
-            normalized = max(-1.0, min(1.0, raw_score / 40.0))
+            # Fix dividing factor from 40.0 to 10.0 so the sentiment slider moves actively
+            normalized = max(-1.0, min(1.0, raw_score / 10.0))
             if normalized > 0.1:
                 sent_label = "BULLISH"
             elif normalized < -0.1:

@@ -135,6 +135,10 @@ app.include_router(binance_trading_router)
 from backend.routes.backtest import router as backtest_router
 app.include_router(backtest_router)
 
+# Register AI Settings Optimizer router
+from backend.api.ai_optimization import router as ai_optimization_router
+app.include_router(ai_optimization_router)
+
 
 # Serve static files from 'dist' directory if it exists
 dist_dir = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "dist")

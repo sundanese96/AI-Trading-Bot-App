@@ -107,5 +107,15 @@ export const apiBot = {
     const res = await fetchBase("/api/ai-bot/logs/clear", { method: "POST" });
     if (!res.ok) throw new Error("Failed to clear logs");
     return await res.json();
+  },
+  
+  optimizeSettings: async (settings: any) => {
+    const res = await fetchBase("/api/ai-bot/optimize-settings", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ settings })
+    });
+    if (!res.ok) throw new Error("Gagal mengoptimalkan parameter.");
+    return await res.json();
   }
 };
