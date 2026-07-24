@@ -167,12 +167,22 @@ async def execute_futures_order(
             "message": f"Insufficient available balance. Required margin: {initial_margin:.2f} USDT, Available balance: {available_balance:.2f} USDT."
         }
 
+    # Calculate estimated SL price
+    sl_price = ticker_price * (1 - stop_loss_pct / 100.0) if side == "BUY" else ticker_price * (1 + stop_loss_pct / 100.0)
+    sl_price = round(sl_price, 4 if symbol == "XRP" else 2)
+    
+    # Calculate estimated TP price (if requested)
+    tp_price = None
+    if take_profit_pct:
+        tp_price = ticker_price * (1 + take_profit_pct / 100.0) if side == "BUY" else ticker_price * (1 - take_profit_pct / 100.0)
+        tp_price = round(tp_price, 4 if symbol == "XRP" else 2)
+
     # 3. Dry-Run / Paper Trading Mode
     if dry_run:
         print(f"[DRY-RUN] Simulating Futures Order: {side} {quantity} {symbol}USDT with {leverage}x leverage.")
-        print(f"[DRY-RUN] Simulating SL Bracket: {stop_loss_pct}%")
+        print(f"[DRY-RUN] Simulating SL Bracket: {stop_loss_pct}% at price {sl_price}")
         if take_profit_pct:
-            print(f"[DRY-RUN] Simulating TP Bracket: {take_profit_pct}%")
+            print(f"[DRY-RUN] Simulating TP Bracket: {take_profit_pct}% at price {tp_price}")
             
         # Simulate a small random slippage/fee for paper trading
         simulated_pnl = -0.05  # Assume small fee/slippage on entry
@@ -183,8 +193,8 @@ async def execute_futures_order(
             "message": "[DRY-RUN] Paper trade executed successfully. No real order was submitted.",
             "data": {
                 "order": {"symbol": f"{symbol}USDT", "side": side, "origQty": quantity, "price": "0.0", "avgPrice": str(ticker_price), "status": "FILLED"},
-                "stop_loss": {"symbol": f"{symbol}USDT", "side": "SELL" if side == "BUY" else "BUY", "stopPrice": "0.955", "status": "NEW"},
-                "take_profit": {"symbol": f"{symbol}USDT", "side": "SELL" if side == "BUY" else "BUY", "stopPrice": "1.1125", "status": "NEW"} if take_profit_pct else None
+                "stop_loss": {"symbol": f"{symbol}USDT", "side": "SELL" if side == "BUY" else "BUY", "stopPrice": str(sl_price), "status": "NEW"},
+                "take_profit": {"symbol": f"{symbol}USDT", "side": "SELL" if side == "BUY" else "BUY", "stopPrice": str(tp_price), "status": "NEW"} if take_profit_pct else None
             }
         }
 

@@ -89,7 +89,11 @@ async def _execute_simulated_trade(headline, target_asset, decision, confidence,
     from backend.services.market import get_asset_current_price
     from backend.sentix_adapter import sentix_state, _save_sentix_db
     
-    live_price = get_asset_current_price(target_asset) or 64000.0
+    live_price = get_asset_current_price(target_asset)
+    if not live_price or live_price <= 0.0:
+        print(f"[Refactored Engine] Failed to resolve current live price for asset {target_asset}. Aborting trade.")
+        return
+        
     symbol_usdt = f"{target_asset}USDT"
     
     log_action = "BUY" if decision == "LONG" else "SELL" if decision == "SHORT" else "HOLD"

@@ -11,7 +11,11 @@ from backend.services.news import news_feed, news_feed_lock, analyze_sentiment
 async def _execute_simulated_trade(headline, target_asset, decision, confidence, strategy, trade_decision, correlation_log, veto_active, bot_settings, threshold):
     from backend.sentix_adapter import sentix_state, _save_sentix_db
     
-    live_price = get_asset_current_price(target_asset) or 64000.0
+    live_price = get_asset_current_price(target_asset)
+    if not live_price or live_price <= 0.0:
+        logger.error(f"[Simulator] Failed to resolve current live price for asset {target_asset}. Aborting trade.")
+        return
+        
     symbol_usdt = f"{target_asset}USDT"
     
     log_action = "BUY" if decision == "LONG" else "SELL" if decision == "SHORT" else "HOLD"
