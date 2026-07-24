@@ -221,8 +221,10 @@ def predict_live_with_gate(
     
     if is_binary_model:
         # Binary mode: 0=SHORT, 1=LONG
-        pred_class = int(probs >= 0.5)  # 0 or 1
-        confidence = float(probs) if pred_class == 1 else float(1 - probs)
+        pred_bin = int(probs >= 0.5)  # 0 or 1
+        confidence = float(probs) if pred_bin == 1 else float(1 - probs)
+        # Map 0 (SHORT) -> -1, 1 (LONG) -> 1 to align with bot execution expectations
+        pred_class = -1 if pred_bin == 0 else 1
     else:
         # Multiclass mode: [-1, 0, 1]
         pred_class_idx = probs.argmax()

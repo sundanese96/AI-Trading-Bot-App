@@ -150,24 +150,21 @@ def predict_live(df_latest: pd.DataFrame, model_type: str = "xgboost") -> Tuple[
     Generates prediction and confidence score for the latest candle.
     Returns: (prediction [-1, 0, 1], confidence [0.0 - 1.0])
     """
-    model = load_model(model_type)
-    if model is None:
-        return 0, 0.0
-        
-    # Extract features for the latest candle
-    features = extract_features(df_latest)
-    latest_features = features.iloc[[-1]]
+    # Redirect to the main robust inference framework to prevent desync
+    from backend.services.ml.inference import predict_live_with_gate
     
-    if model_type.lower() == "lightgbm":
-        probs = model.predict(latest_features)[0]
-    elif model_type.lower() == "catboost":
-        probs = model.predict_proba(latest_features)[0]
-    else:
-        dmatrix = xgb.DMatrix(latest_features)
-        probs = model.predict(dmatrix)[0]
-    
-    pred_class_idx = probs.argmax()
-    pred_class = pred_class_idx - 1 # Map [0, 1, 2] back to [-1, 0, 1]
-    confidence = float(probs[pred_class_idx])
-    
-    return pred_class, confidence
+    # Try to extract the resample timeframe or fallback to 5m
+    resample_minutes = 5
+    if 'interval' in df_latest.columns:
+        interval = df_latest['interval'].iloc[-1]
+        if interval == '15m':
+            resample_minutes = 15
+        elif interval == '1h':
+            resample_minutes = 60
+        elif interval == '3h':
+            resample_minutes = 180
+            
+    pred, conf, _, _, _, _, _ = predict_live_with_gate(
+        df_latest, model_type=model_type, resample_minutes=resample_minutes
+    )
+    return pred, conf

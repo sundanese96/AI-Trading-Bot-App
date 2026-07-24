@@ -72,8 +72,17 @@ def train_meta_model(
     # 1. Build meta-features for TRAIN set
     print("\n[Meta-Model] Generating primary model predictions on train set...")
     train_probs = _get_probabilities(primary_model, model_type, X_train)
-    train_preds = train_probs.argmax(axis=1) - 1
-    train_confs = train_probs.max(axis=1)
+    
+    # Determine if model is binary or multiclass
+    is_binary = train_probs.ndim == 1 or train_probs.shape[1] == 1
+    if is_binary:
+        # Binary mode: probs are already [0,1] scores
+        train_preds = (train_probs >= 0.5).astype(int)
+        train_confs = train_probs
+    else:
+        # Multiclass mode: [-1, 0, 1]
+        train_preds = train_probs.argmax(axis=1) - 1
+        train_confs = train_probs.max(axis=1)
     
     dir_mask_train = (train_preds != 0)
     X_meta_train = X_train[dir_mask_train].copy()
@@ -88,8 +97,13 @@ def train_meta_model(
     # 2. Build meta-features for VAL set (early stopping)
     print("[Meta-Model] Generating primary model predictions on val set...")
     val_probs = _get_probabilities(primary_model, model_type, X_val)
-    val_preds = val_probs.argmax(axis=1) - 1
-    val_confs = val_probs.max(axis=1)
+    
+    if is_binary:
+        val_preds = (val_probs >= 0.5).astype(int)
+        val_confs = val_probs
+    else:
+        val_preds = val_probs.argmax(axis=1) - 1
+        val_confs = val_probs.max(axis=1)
     
     dir_mask_val = (val_preds != 0)
     X_meta_val = X_val[dir_mask_val].copy()
@@ -102,8 +116,13 @@ def train_meta_model(
     
     # 3. Build meta-features for TEST set (final evaluation)
     test_probs = _get_probabilities(primary_model, model_type, X_test)
-    test_preds = test_probs.argmax(axis=1) - 1
-    test_confs = test_probs.max(axis=1)
+    
+    if is_binary:
+        test_preds = (test_probs >= 0.5).astype(int)
+        test_confs = test_probs
+    else:
+        test_preds = test_probs.argmax(axis=1) - 1
+        test_confs = test_probs.max(axis=1)
     
     dir_mask_test = (test_preds != 0)
     X_meta_test = X_test[dir_mask_test].copy()
