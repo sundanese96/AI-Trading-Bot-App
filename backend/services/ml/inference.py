@@ -158,11 +158,17 @@ def predict_live_with_gate(
     # 3. Check OOD Guard
     is_ood, ood_violations = check_ood_guard(latest_features, resample_minutes)
     
+    # Extract target asset name for file prefix matching
+    target_asset = df_latest['symbol'].iloc[-1].upper().replace("USDT", "") if 'symbol' in df_latest.columns else "BTC"
+    
     # 4. Load Primary Model
-    model = load_model(model_type, resample_minutes)
+    model = load_model(model_type, resample_minutes, target_asset)
     if model is None:
-        print(f"[Inference] Warning: Model type {model_type} for timeframe {resample_minutes}m not found on disk.")
-        return 0, 0.0, is_ood, ood_violations, None, False, False
+        # Try fallback to global model
+        model = load_model(model_type, resample_minutes, "GLOBAL")
+        if model is None:
+            print(f"[Inference] Warning: Model type {model_type} for timeframe {resample_minutes}m (asset={target_asset} or GLOBAL) not found on disk.")
+            return 0, 0.0, is_ood, ood_violations, None, False, False
         
     # Dynamic feature alignment to match the loaded model's training columns
     model_features = None
@@ -212,7 +218,11 @@ def predict_live_with_gate(
     if pred_class != 0:  # Only run meta-model for directional predictions
         try:
             from backend.services.ml.meta_model import load_meta_model, predict_meta
-            meta_model = load_meta_model(resample_minutes)
+            meta_model = load_meta_model(resample_minutes, target_asset)
+            if meta_model is None:
+                # Try fallback to global meta model
+                meta_model = load_meta_model(resample_minutes, "GLOBAL")
+                
             if meta_model is not None:
                 p_win_val, meta_approved = predict_meta(
                     meta_model, model, model_type, latest_features

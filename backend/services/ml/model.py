@@ -12,14 +12,25 @@ SCALER_PATH = MODEL_DIR / "scaler.pkl"
 # Ensure models directory exists
 MODEL_DIR.mkdir(parents=True, exist_ok=True)
 
-def get_model_path(model_type: str, resample_minutes: Optional[int] = None) -> Path:
+def get_model_path(model_type: str, resample_minutes: Optional[int] = None, symbol: Optional[str] = None) -> Path:
     tf_suffix = f"_{resample_minutes}m" if resample_minutes and resample_minutes > 1 else ""
+    
+    # Enforce asset-specific naming or fallback to global for memecoins/altcoins
+    sym_lower = "global"
+    if symbol:
+        sym_clean = symbol.upper().replace("USDT", "")
+        # Main assets have their own models, others use global
+        if sym_clean in ["BTC", "ETH", "SOL", "BNB"]:
+            sym_lower = sym_clean.lower()
+            
+    asset_prefix = f"{sym_lower}_"
+    
     if model_type.lower() == "lightgbm":
-        return MODEL_DIR / f"lightgbm_model{tf_suffix}.txt"
+        return MODEL_DIR / f"{asset_prefix}lightgbm_model{tf_suffix}.txt"
     elif model_type.lower() == "catboost":
-        return MODEL_DIR / f"catboost_model{tf_suffix}.cbm"
+        return MODEL_DIR / f"{asset_prefix}catboost_model{tf_suffix}.cbm"
     else:
-        return MODEL_DIR / f"xgboost_model{tf_suffix}.json"
+        return MODEL_DIR / f"{asset_prefix}xgboost_model{tf_suffix}.json"
 
 def get_device() -> str:
     """Detects if CUDA GPU is available safely without hard crashes."""
@@ -47,13 +58,14 @@ def train_model(
     threshold_pct: float = 0.15,
     num_rounds: int = 100,
     model_type: str = "xgboost",
-    resample_minutes: Optional[int] = None
+    resample_minutes: Optional[int] = None,
+    symbol: Optional[str] = None
 ) -> Dict[str, Any]:
     """
     Trains an XGBoost, LightGBM, or CatBoost Classifier on the prepared training data.
     Saves the trained model and evaluation metrics.
     """
-    print(f"[ML Model] Starting model training pipeline ({model_type.upper()}) at timeframe {resample_minutes or 1}m...")
+    print(f"[ML Model] Starting model training pipeline ({model_type.upper()}) for asset {symbol or 'GLOBAL'} at timeframe {resample_minutes or 1}m...")
     
     try:
         # 1. Prepare data
@@ -73,7 +85,13 @@ def train_model(
             p99 = float(np.percentile(X_train[col].dropna(), 99))
             bounds[col] = {"p1": p1, "p99": p99}
             
-        bounds_path = MODEL_DIR / f"training_feature_bounds_{resample_minutes or 1}m.json"
+        sym_lower = "global"
+        if symbol:
+            sym_clean = symbol.upper().replace("USDT", "")
+            if sym_clean in ["BTC", "ETH", "SOL", "BNB"]:
+                sym_lower = sym_clean.lower()
+                
+        bounds_path = MODEL_DIR / f"{sym_lower}_training_feature_bounds_{resample_minutes or 1}m.json"
         with open(bounds_path, "w") as f:
             json.dump(bounds, f, indent=2)
         print(f"[ML Model] Feature percentiles (1st and 99th) saved to {bounds_path}")
@@ -97,7 +115,7 @@ def train_model(
             sample_weights = sample_weights * regime_multiplier
             print(f"[ML Model] Extremely volatile samples (top 1% ATR > {threshold_val:.4f}) downweighted to 0.1 coefficient.")
             
-        model_save_path = get_model_path(model_type, resample_minutes)
+        model_save_path = get_model_path(model_type, resample_minutes, symbol)
         
         if model_type.lower() == "lightgbm":
             import lightgbm as lgb
@@ -277,9 +295,9 @@ def train_model(
         
         raise e
 
-def load_model(model_type: str = "xgboost", resample_minutes: Optional[int] = None) -> Optional[Any]:
+def load_model(model_type: str = "xgboost", resample_minutes: Optional[int] = None, symbol: Optional[str] = None) -> Optional[Any]:
     """Loads the trained ML model (XGBoost, LightGBM, or CatBoost) from disk."""
-    model_path = get_model_path(model_type, resample_minutes)
+    model_path = get_model_path(model_type, resample_minutes, symbol)
     if model_type.lower() == "lightgbm":
         if not model_path.exists():
             return None

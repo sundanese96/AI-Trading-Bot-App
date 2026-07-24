@@ -24,9 +24,14 @@ MODEL_DIR = Path(__file__).resolve().parent.parent.parent / "models"
 MODEL_DIR.mkdir(parents=True, exist_ok=True)
 
 
-def get_meta_model_path(resample_minutes: Optional[int] = None) -> Path:
+def get_meta_model_path(resample_minutes: Optional[int] = None, symbol: Optional[str] = None) -> Path:
     suffix = f"_{resample_minutes}m" if resample_minutes and resample_minutes > 1 else ""
-    return MODEL_DIR / f"meta_model{suffix}.txt"
+    sym_lower = "global"
+    if symbol:
+        sym_clean = symbol.upper().replace("USDT", "")
+        if sym_clean in ["BTC", "ETH", "SOL", "BNB"]:
+            sym_lower = sym_clean.lower()
+    return MODEL_DIR / f"{sym_lower}_meta_model{suffix}.txt"
 
 
 def get_calibrator_path(resample_minutes: Optional[int] = None) -> Path:
@@ -221,10 +226,10 @@ def train_meta_model(
     return metrics
 
 
-def load_meta_model(resample_minutes: Optional[int] = None):
+def load_meta_model(resample_minutes: Optional[int] = None, symbol: Optional[str] = None):
     """Loads the trained meta-model from disk."""
     import lightgbm as lgb
-    model_path = get_meta_model_path(resample_minutes)
+    model_path = get_meta_model_path(resample_minutes, symbol)
     if not model_path.exists():
         print(f"[Meta-Model] No meta-model found at {model_path}")
         return None

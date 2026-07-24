@@ -339,6 +339,7 @@ export default function App() {
     features: string[];
     symbol: string;
     modelType?: string;
+    timeframeMinutes?: number;
   }) => {
     const response = await fetch("/api/ml/train", {
       method: "POST",

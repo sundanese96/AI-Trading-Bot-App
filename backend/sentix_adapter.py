@@ -600,9 +600,7 @@ async def get_ml_models():
             for ext in ["*.json", "*.txt", "*.cbm"]:
                 for filepath in models_dir.glob(ext):
                     name = filepath.name.lower()
-                    if "model" not in name:
-                        continue
-                        
+                    
                     # Extract model type (xgboost, lightgbm, catboost)
                     model_type = "xgboost"
                     if "lightgbm" in name:
@@ -618,7 +616,13 @@ async def get_ml_models():
                         if part in name:
                             interval = part
 
-                    model_id = f"model-{model_type}-{interval}"
+                    # Determine asset/coin name or fallback to GLOBAL
+                    asset_label = "GLOBAL"
+                    for part in ["btc", "eth", "sol", "bnb", "xrp", "ada", "sui", "doge"]:
+                        if part in name:
+                            asset_label = part.upper()
+                            
+                    model_id = f"model-{model_type}-{asset_label.lower()}-{interval}"
                     if model_id not in seen_ids:
                         # Determine features list based on type
                         features = ["ma10", "ma20", "rsi_14", "macd_line", "macd_hist", "volume_sma_ratio"]
@@ -636,7 +640,7 @@ async def get_ml_models():
                         
                         models.append({
                             "id": model_id,
-                            "name": f"Pre-Trained {model_type.upper()} ({interval})",
+                            "name": f"Pre-Trained {model_type.upper()} ({asset_label} - {interval})",
                             "trainedAt": trained_at,
                             "r2Score": r2_score,
                             "features": features
@@ -691,9 +695,10 @@ async def train_ml_model(request: Request):
         r2_score = round(0.58 + random.uniform(0.02, 0.14), 4)
 
         # Register the trained model in sentix_state.
-        # If a model with the same name (type + symbol) already exists, update/overwrite it instead of adding a new card.
-        model_name = f"Latih Mandiri {model_type.upper()} ({symbol})"
-        model_id = f"model-{model_type}-{symbol.lower()}"
+        # If a model with the same name (type + symbol + timeframe) already exists, update/overwrite it instead of adding a new card.
+        timeframe_minutes = int(body.get("timeframeMinutes", 5))
+        model_name = f"Latih Mandiri {model_type.upper()} ({symbol} - {timeframe_minutes}m)"
+        model_id = f"model-{model_type}-{symbol.lower()}-{timeframe_minutes}m"
         new_model = {
             "id": model_id,
             "name": model_name,
@@ -738,7 +743,9 @@ async def train_ml_model(request: Request):
                 file_path=str(feather_path),
                 target_window=15,
                 threshold_pct=0.15,
-                model_type=model_type
+                model_type=model_type,
+                resample_minutes=timeframe_minutes,
+                symbol=symbol
             ))
 
         return {

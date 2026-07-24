@@ -10,6 +10,7 @@ interface MLPanelProps {
     features: string[];
     symbol: string;
     modelType?: string;
+    timeframeMinutes?: number;
   }) => Promise<{ modelId: string; r2Score: number; lossHistory: { epoch: number; loss: number }[]; weights: { [key: string]: number }; bias: number }>;
   onGetForecast: (params: {
     symbol: string;
@@ -26,6 +27,7 @@ export function MLPanel({ onTrainModel, onGetForecast, onDownloadData, savedMode
   const [learningRate, setLearningRate] = useState(0.01);
   const [epochs, setEpochs] = useState(100);
   const [symbol, setSymbol] = useState("BTCUSDT");
+  const [timeframeMinutes, setTimeframeMinutes] = useState(5);
   const [selectedFeatures, setSelectedFeatures] = useState<string[]>(["ma10", "ma20", "rsi", "volume"]);
   const [modelType, setModelType] = useState('xgboost');
 
@@ -91,6 +93,7 @@ export function MLPanel({ onTrainModel, onGetForecast, onDownloadData, savedMode
         epochs,
         features: selectedFeatures,
         symbol,
+        timeframeMinutes
       });
 
       const totalEpochs = response.lossHistory.length;
@@ -174,7 +177,7 @@ const handleGetAIForecast = async () => {
             </div>
 
 <form onSubmit={handleTrainLocalModel} className="space-y-4 text-xs">
-              <div className="grid grid-cols-3 gap-2">
+              <div className="grid grid-cols-4 gap-2">
                 <div className="space-y-1">
                   <label className="text-slate-400 font-mono">KOIN DATASET</label>
                   <select
@@ -190,11 +193,23 @@ const handleGetAIForecast = async () => {
                     <option value="ADAUSDT">ADAUSDT</option>
                     <option value="DOGEUSDT">DOGEUSDT</option>
                     <option value="DOTUSDT">DOTUSDT</option>
-                    <option value="SHIBUSDT">SHIBUSDT</option>
+                    <option value="1000SHIBUSDT">1000SHIBUSDT</option>
                     <option value="LTCUSDT">LTCUSDT</option>
                     <option value="LINKUSDT">LINKUSDT</option>
                     <option value="NEARUSDT">NEARUSDT</option>
                     <option value="SUIUSDT">SUIUSDT</option>
+                  </select>
+                </div>
+                <div className="space-y-1">
+                  <label className="text-slate-400 font-mono">TIMEFRAME</label>
+                  <select
+                    value={timeframeMinutes}
+                    onChange={(e) => setTimeframeMinutes(Number(e.target.value))}
+                    className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-slate-200 outline-none"
+                  >
+                    <option value={5}>5m</option>
+                    <option value={15}>15m</option>
+                    <option value={60}>60m</option>
                   </select>
                 </div>
                 <div className="space-y-1">
@@ -204,7 +219,7 @@ const handleGetAIForecast = async () => {
                     onChange={(e) => setLearningRate(parseFloat(e.target.value))}
                     className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-slate-200 outline-none font-mono"
                   >
-                    <option value="0.001">0.001 (Presisi Tinggi)</option>
+                    <option value="0.001">0.001 (Presisi)</option>
                     <option value="0.01">0.01 (Standar)</option>
                     <option value="0.05">0.05 (Agresif)</option>
                   </select>
@@ -219,9 +234,6 @@ const handleGetAIForecast = async () => {
                     <option value="xgboost">xgboost</option>
                     <option value="catboost">catboost</option>
                     <option value="lightgbm">lightgbm</option>
-                    <option value="pytorch">pytorch</option>
-                    <option value="gbdt">gbdt (Python GBDT)</option>
-                    <option value="linear">linear (Linear JS)</option>
                   </select>
                 </div>
               </div>
