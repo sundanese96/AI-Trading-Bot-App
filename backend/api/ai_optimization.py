@@ -45,7 +45,7 @@ async def optimize_settings_endpoint(request: Request):
         news_context = "\n".join(recent_headlines)
         
         # Define LLM instructions
-        system_instruction = """You are a senior quantitative risk manager. Your job is to analyze the bot's current parameter configuration, market conditions, and recent news events to recommend optimized trading settings.
+        system_instruction = """You are a senior quantitative risk manager. Your job is to analyze the bot's current parameter configuration, market conditions, recent news events, and model benchmark test results to recommend optimized trading settings.
 You must return your output ONLY as a valid JSON object matching the exact keys of the input configuration settings. Do not write any preamble, explanation, or markdown block. Return ONLY the JSON object.
 
 Keys to include in output JSON:
@@ -62,9 +62,41 @@ Keys to include in output JSON:
   "riskLevel": "LOW" or "MEDIUM" or "HIGH",
   "tpMultiplier": float (0.5 to 2.5),
   "slMultiplier": float (0.5 to 2.5),
-  "vetoGateMode": "ON" or "OFF" or "AUTO"
+  "vetoGateMode": "ON" or "OFF" or "AUTO",
+  "modelType": "xgboost" or "lightgbm" or "catboost",
+  "timeframeMinutes": 5 or 15 or 60
 }"""
         
+        # Read the latest sensitivity benchmark results from the script execution context
+        # We can dynamically run the benchmark script in a sub-thread or read from file
+        benchmark_results = "N/A"
+        try:
+            from backend.scratch.benchmark_models import FEATHER_PATH
+            from backend.services.ml.data_prep import prepare_training_data
+            from backend.services.ml.model import load_model
+            from backend.services.ml.evaluator import evaluate_model_performance
+            
+            benchmark_runs = []
+            if FEATHER_PATH.exists():
+                for tf in [5, 15, 60]:
+                    try:
+                        _, _, train, val, test = prepare_training_data(
+                            str(FEATHER_PATH), target_window=15, threshold_pct=0.15, resample_minutes=tf
+                        )
+                        for m_type in ["xgboost", "lightgbm", "catboost"]:
+                            model = load_model(m_type, resample_minutes=tf, symbol="BTC")
+                            if model is not None:
+                                metrics = evaluate_model_performance(train[0], train[1], val[0], val[1], test[0], test[1], model)
+                                benchmark_runs.append(
+                                    f"- {m_type.upper()} ({tf}m): Acc {metrics['test']['accuracy']:.4f}, F1 {metrics['test']['f1']:.4f}, P&L {metrics['backtest_pnl']:.2f}%"
+                                )
+                    except Exception:
+                        pass
+            if benchmark_runs:
+                benchmark_results = "\n".join(benchmark_runs)
+        except Exception as bench_err:
+            logger.error(f"[AI Optimizer] Benchmark reading failed: {bench_err}")
+            
         prompt = f"""=== CURRENT BOT SETTINGS ===
 {json.dumps(current_settings, indent=2)}
 
@@ -78,7 +110,10 @@ Keys to include in output JSON:
 === REAL-TIME CRYPTO MARKET OVERVIEW ===
 {market_overview}
 
-Based on the current volatility, sentiment, and environment balance, recommend the optimal settings for minimizing drawdowns and maximizing capture efficiency. If the market is neutral/sideways, suggest a conservative structure (e.g., lower leverage, higher minConfidence, tighter stopLossPct, and AUTO vetoGate).
+=== MACHINE LEARNING MODEL BENCHMARK RESULTS ===
+{benchmark_results}
+
+Based on the current volatility, sentiment, environment balance, and ML model accuracy/F1 performance benchmarks, recommend the optimal settings. Select the modelType and timeframeMinutes that have shown the highest accuracy/F1 and best P&L in the benchmark. If the market is neutral/sideways, suggest a conservative structure.
 """
         
         # Determine provider & model
