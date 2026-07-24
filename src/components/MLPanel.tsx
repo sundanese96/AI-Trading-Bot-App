@@ -185,6 +185,7 @@ const handleGetAIForecast = async () => {
                     onChange={(e) => setSymbol(e.target.value)}
                     className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-slate-200 outline-none"
                   >
+                    <option value="ALL">ALL COINS (Batch)</option>
                     <option value="BTCUSDT">BTCUSDT</option>
                     <option value="ETHUSDT">ETHUSDT</option>
                     <option value="SOLUSDT">SOLUSDT</option>
