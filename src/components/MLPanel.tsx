@@ -530,29 +530,78 @@ const handleGetAIForecast = async () => {
       </div>
 
       {/* Historical List Models Trained */}
-      <div className="bg-slate-900/40 backdrop-blur-md border border-slate-800/60 rounded-2xl p-6 shadow-2xl">
-        <h4 className="font-sans font-bold text-white text-base mb-4">Daftar Model ML yang Dilatih di Server ({savedModels.length})</h4>
+      <div className="bg-slate-900/40 backdrop-blur-md border border-slate-800/60 rounded-2xl p-6 shadow-2xl space-y-6">
+        <h4 className="font-sans font-bold text-white text-base border-b border-slate-800 pb-3">
+          Daftar Model ML yang Dilatih di Server ({savedModels.length})
+        </h4>
+        
         {savedModels.length === 0 ? (
           <p className="text-xs text-slate-500 font-mono">Belum ada model lokal yang tersimpan dalam database server.</p>
         ) : (
-          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
-            {savedModels.map((model) => (
-              <div key={model.id} className="bg-slate-950/60 border border-slate-850 p-4 rounded-xl flex flex-col justify-between">
-                <div>
-                  <h5 className="font-sans font-bold text-sm text-indigo-400">{model.name}</h5>
-                  <p className="text-[10px] text-slate-500 font-mono">Dibuat: {new Date(model.trainedAt).toLocaleString()}</p>
-                  <p className="text-xs text-slate-300 mt-2 font-mono">Akurasi R²: <span className="text-emerald-400 font-bold">{model.r2Score}</span></p>
-                  <div className="flex flex-wrap gap-1 mt-2">
-                    {model.features.map((f) => (
-                      <span key={f} className="text-[9px] font-mono bg-slate-900 border border-slate-800 text-slate-400 px-1.5 py-0.5 rounded">
-                        {f.toUpperCase()}
-                      </span>
-                    ))}
+          (() => {
+            // Group models dynamically by target coin/asset or general interval if pre-trained
+            const grouped: { [key: string]: typeof savedModels } = {};
+            
+            savedModels.forEach((model) => {
+              let groupName = "PRE-TRAINED GLOBAL";
+              
+              // Extract target symbol name if present (e.g. (SOLUSDT) or (BTCUSDT))
+              const nameLower = model.name.toLowerCase();
+              if (nameLower.includes("btc")) {
+                groupName = "BITCOIN (BTC)";
+              } else if (nameLower.includes("eth")) {
+                groupName = "ETHEREUM (ETH)";
+              } else if (nameLower.includes("sol")) {
+                groupName = "SOLANA (SOL)";
+              } else if (nameLower.includes("bnb")) {
+                groupName = "BNB COIN (BNB)";
+              } else if (nameLower.includes("xrp")) {
+                groupName = "RIPPLE (XRP)";
+              } else if (nameLower.includes("ada")) {
+                groupName = "CARDANO (ADA)";
+              } else if (nameLower.includes("sui")) {
+                groupName = "SUI COIN (SUI)";
+              } else if (nameLower.includes("doge")) {
+                groupName = "DOGECOIN (DOGE)";
+              }
+              
+              if (!grouped[groupName]) {
+                grouped[groupName] = [];
+              }
+              grouped[groupName].push(model);
+            });
+            
+            return (
+              <div className="space-y-8">
+                {Object.entries(grouped).map(([group, modelsList]) => (
+                  <div key={group} className="space-y-3">
+                    <h5 className="font-mono text-xs font-bold text-indigo-400 border-l-2 border-indigo-500 pl-2 uppercase tracking-wider">
+                      {group} ({modelsList.length} Model)
+                    </h5>
+                    
+                    <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
+                      {modelsList.map((model) => (
+                        <div key={model.id} className="bg-slate-950/60 border border-slate-850 p-4 rounded-xl flex flex-col justify-between hover:border-slate-700 transition">
+                          <div>
+                            <h5 className="font-sans font-bold text-sm text-slate-200">{model.name}</h5>
+                            <p className="text-[10px] text-slate-500 font-mono mt-1">Dibuat: {new Date(model.trainedAt).toLocaleString()}</p>
+                            <p className="text-xs text-slate-300 mt-2 font-mono">Akurasi R²: <span className="text-emerald-400 font-bold">{model.r2Score}</span></p>
+                            <div className="flex flex-wrap gap-1 mt-2">
+                              {model.features.map((f) => (
+                                <span key={f} className="text-[9px] font-mono bg-slate-900 border border-slate-800 text-slate-400 px-1.5 py-0.5 rounded">
+                                  {f.toUpperCase()}
+                                </span>
+                              ))}
+                            </div>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
                   </div>
-                </div>
+                ))}
               </div>
-            ))}
-          </div>
+            );
+          })()
         )}
       </div>
     </div>
