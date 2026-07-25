@@ -206,31 +206,22 @@ def predict_live_with_gate(
         else:
             probs = raw_pred
     
-    # Determine if model was trained in binary or multiclass mode
-    # Check model file header or default to binary (V2 standard)
+    # Determine if model is binary or multiclass dynamically based on prediction output shape
     is_binary_model = False
-    try:
-        from backend.services.ml.model import get_model_path
-        m_path = get_model_path(model_type, resample_minutes, target_asset)
-        with open(str(m_path), 'r') as _f:
-            _header = _f.readline()
-            if '"objective":"binary"' in _header or '"objective": "binary"' in _header:
-                is_binary_model = True
-    except Exception:
-        pass
     
-    # Also check lightgbm/catboost model headers
-    if model_type.lower() == "lightgbm" and hasattr(model, "current_config"):
-        try:
-            cfg = model.current_config()
-            if '"objective": "binary"' in str(cfg):
-                is_binary_model = True
-        except Exception:
-            pass
+    # If probs is a single number, 1D array of size 1 or 2, or shape is (1,) or (2,)
+    if isinstance(probs, (int, float, np.float32, np.float64)):
+        is_binary_model = True
+    elif hasattr(probs, "ndim"):
+        if probs.ndim == 0:
+            is_binary_model = True
+        elif probs.ndim == 1 and len(probs) <= 2:
+            is_binary_model = True
+    elif isinstance(probs, (list, tuple)) and len(probs) <= 2:
+        is_binary_model = True
     
     if is_binary_model:
         # Binary mode: 0=SHORT, 1=LONG
-        # If probs is an array/list (multiclass fallback), take argmax, otherwise evaluate as scalar probability
         if isinstance(probs, np.ndarray) or isinstance(probs, list):
             # If shape is (2,), it means [P(SHORT), P(LONG)]
             if len(probs) == 2:
