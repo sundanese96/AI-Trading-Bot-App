@@ -99,12 +99,14 @@ export interface Candlestick {
 
 export interface BacktestParams {
   symbol: string;
-  strategy: "SMA_CROSS" | "RSI_REVERSAL" | "MACD_CROSS" | "BOLLINGER_REVERSION";
+  strategy: "SMA_CROSS" | "RSI_REVERSAL" | "MACD_CROSS" | "BOLLINGER_REVERSION" | "CONSERVATIVE" | "SCALPING" | "SWING" | "AGGRESSIVE" | "MARTINGALE" | "HEDGING";
   interval: "1h" | "1d";
   startingBalance: number;
   leverage: number;
   stopLossPct: number;
   takeProfitPct: number;
+  minConfidence?: number;
+  modelType?: string;
   smaShort?: number;
   smaLong?: number;
   rsiOversold?: number;

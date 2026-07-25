@@ -909,11 +909,29 @@ def run_backtest_simulation(params: dict):
     sma_long_len = int(params.get("smaLong", 30))
     rsi_oversold = float(params.get("rsiOversold", 30))
     rsi_overbought = float(params.get("rsiOverbought", 70))
+    
+    # ML model confirmation parameters for backtest
+    min_confidence = float(params.get("minConfidence", 50.0)) / 100.0
+    model_type = str(params.get("modelType", "lightgbm")).lower()
 
     import httpx
     import time
     import random
     from backend.config import VERIFY_SSL
+    
+    # Import ML inference components
+    from backend.services.ml.model import load_model, get_model_path
+    from backend.services.ml.features import extract_features
+    import xgboost as xgb
+    import pandas as pd
+    
+    # Try to load the target ML model for this backtest asset
+    base_asset = symbol.replace("USDT", "")
+    resample_minutes = 5 if interval == "1h" else 60 # map interval to standard trained resamples
+    ml_model = load_model(model_type, resample_minutes=resample_minutes, symbol=base_asset)
+    if ml_model is None:
+        # Fallback to global model
+        ml_model = load_model(model_type, resample_minutes=resample_minutes, symbol="GLOBAL")
     
     # 1. Fetch candles
     klines = []
@@ -1149,7 +1167,73 @@ def run_backtest_simulation(params: dict):
                 
         # If no position open, evaluate entry signals
         elif i < len(parsed_candles) - 1: # Don't open position on the last candle
-            if buy_signal:
+            # Evaluate ML Model Confidence gate if model is loaded and we have directional signal
+            ml_passed = True
+            if ml_model is not None and (buy_signal or sell_signal):
+                try:
+                    # Construct window of prices for feature extraction
+                    hist_slice = parsed_candles[max(0, i-100):i+1]
+                    # Convert to pandas DataFrame matching feature extractor format
+                    df_slice = pd.DataFrame(hist_slice)
+                    df_slice['date'] = pd.to_datetime(df_slice['timestamp'], unit='ms')
+                    df_slice['symbol'] = raw_symbol
+                    
+                    # Extract features
+                    feat = extract_features(df_slice)
+                    feat_row = feat.iloc[[-1]].copy()
+                    
+                    # Align columns
+                    model_features = None
+                    if model_type == "lightgbm":
+                        if hasattr(ml_model, "feature_name"):
+                            model_features = ml_model.feature_name()
+                    elif model_type == "catboost":
+                        if hasattr(ml_model, "feature_names_"):
+                            model_features = ml_model.feature_names_
+                    else:
+                        if hasattr(ml_model, "feature_names") and ml_model.feature_names is not None:
+                            model_features = ml_model.feature_names
+                            
+                    if model_features is not None:
+                        feat_row = feat_row.reindex(columns=model_features, fill_value=0.0)
+                        
+                    # Predict probability
+                    if model_type == "lightgbm":
+                        probs = ml_model.predict(feat_row)[0]
+                    elif model_type == "catboost":
+                        probs = ml_model.predict_proba(feat_row)[0]
+                    else:
+                        dmatrix = xgb.DMatrix(feat_row)
+                        probs = ml_model.predict(dmatrix)[0]
+                        
+                    # Determine binary or multiclass
+                    # Check header or default to binary V2 standard
+                    is_binary = False
+                    try:
+                        m_path = get_model_path(model_type, resample_minutes, base_asset)
+                        with open(str(m_path), 'r') as _f:
+                            _header = _f.readline()
+                            if '"objective":"binary"' in _header or '"objective": "binary"' in _header:
+                                is_binary = True
+                    except Exception:
+                        pass
+                        
+                    if is_binary:
+                        prob_long = float(probs)
+                        prob_short = float(1.0 - probs)
+                    else:
+                        prob_long = float(probs[2])
+                        prob_short = float(probs[0])
+                        
+                    if buy_signal:
+                        ml_passed = prob_long >= min_confidence
+                    elif sell_signal:
+                        ml_passed = prob_short >= min_confidence
+                except Exception as ml_err:
+                    # Fallback to true if ML inference fails to avoid blocking the backtest
+                    pass
+            
+            if buy_signal and ml_passed:
                 margin = balance * 0.15 # allocate 15% of balance per trade
                 size = (margin * leverage) / close_p
                 balance -= margin
@@ -1161,7 +1245,7 @@ def run_backtest_simulation(params: dict):
                     "entry_time": timestamp
                 }
                 current_equity = balance + margin
-            elif sell_signal:
+            elif sell_signal and ml_passed:
                 margin = balance * 0.15
                 size = (margin * leverage) / close_p
                 balance -= margin

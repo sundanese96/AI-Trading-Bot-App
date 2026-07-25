@@ -24,6 +24,8 @@ export function BacktestPanel({ onRunBacktest }: BacktestPanelProps) {
   const [leverage, setLeverage] = useState(10);
   const [stopLossPct, setStopLossPct] = useState(2);
   const [takeProfitPct, setTakeProfitPct] = useState(6);
+  const [minConfidence, setMinConfidence] = useState(60);
+  const [modelType, setModelType] = useState("lightgbm");
 
   // Strategy specific state
   const [smaShort, setSmaShort] = useState(10);
@@ -48,6 +50,8 @@ export function BacktestPanel({ onRunBacktest }: BacktestPanelProps) {
         leverage,
         stopLossPct,
         takeProfitPct,
+        minConfidence,
+        modelType,
         smaShort,
         smaLong,
         rsiOversold,
@@ -214,6 +218,33 @@ export function BacktestPanel({ onRunBacktest }: BacktestPanelProps) {
                   <option value="1h">1 Jam (Hourly - Standar Day Trading)</option>
                   <option value="1d">1 Hari (Daily - Standar Swing Trading)</option>
                 </select>
+              </div>
+
+              {/* ML model and confidence filter */}
+              <div className="grid grid-cols-2 gap-4 border-t border-slate-850/50 pt-3">
+                <div className="space-y-1.5">
+                  <label className="text-indigo-400 font-mono text-[10px]">MESIN MODEL ML</label>
+                  <select
+                    value={modelType}
+                    onChange={(e) => setModelType(e.target.value)}
+                    className="w-full bg-slate-950 border border-slate-800 focus:border-indigo-500 rounded-xl px-3 py-2.5 outline-none font-sans font-bold text-white text-xs"
+                  >
+                    <option value="lightgbm">LightGBM (Rekomendasi)</option>
+                    <option value="xgboost">XGBoost</option>
+                    <option value="catboost">CatBoost</option>
+                  </select>
+                </div>
+                <div className="space-y-1.5">
+                  <label className="text-indigo-400 font-mono text-[10px]">MIN. KEYAKINAN ML (%)</label>
+                  <input
+                    type="number"
+                    min="10"
+                    max="95"
+                    value={minConfidence}
+                    onChange={(e) => setMinConfidence(parseInt(e.target.value) || 50)}
+                    className="w-full bg-slate-950 border border-slate-800 focus:border-indigo-500 rounded-xl px-3 py-2.5 text-white outline-none font-mono"
+                  />
+                </div>
               </div>
 
               {strategy === "SMA_CROSS" && (
