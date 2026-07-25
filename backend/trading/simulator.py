@@ -95,6 +95,18 @@ async def _execute_simulated_trade(headline, target_asset, decision, confidence,
                     sim["strategyReasoning"] = f"[HEDGING Strategy] Dual directional entry. {trade_decision.get('strategyReasoning', '')}"
                 db["savedTrades"].insert(0, sim)
                 db["savedTrades"] = db["savedTrades"][:100]
+                
+                # Send telegram alert ONLY when trade is successfully added to the database
+                from backend.services.telegram_client import send_telegram_alert
+                asyncio.create_task(send_telegram_alert(
+                    f"🚀 *Simulated Trade Opened* 🚀\n\n"
+                    f"*Asset*: {target_asset}\n"
+                    f"*Action*: {trade_dec}\n"
+                    f"*Entry Price*: ${live_price}\n"
+                    f"*Confidence*: {confidence}%\n"
+                    f"*SL*: {risk['sl_pct_raw']}% | *TP*: {risk['tp_pct_raw']}%\n"
+                    f"*Reason*: {trade_decision.get('strategyReasoning', '')}"
+                ))
 
             if strategy == "HEDGING":
                 if not any(t.get("status") == "OPEN" and t.get("targetAsset") == target_asset and t.get("decision") == "LONG" for t in existing_trades): add_db_trade("LONG", risk["long_sl"], risk["long_tp"])
@@ -104,8 +116,8 @@ async def _execute_simulated_trade(headline, target_asset, decision, confidence,
                     add_db_trade(decision, risk["sl_price"], risk["tp_price"])
             await write_database_async(db)
             
-        from backend.services.telegram_client import send_telegram_alert
-        asyncio.create_task(send_telegram_alert(f"🚀 *Simulated Trade Opened* 🚀\n\n*Asset*: {target_asset}\n*Action*: {decision}\n*Entry Price*: ${live_price}\n*Confidence*: {confidence}%\n*SL*: {risk['sl_pct_raw']}% | *TP*: {risk['tp_pct_raw']}%\n*Reason*: {trade_decision.get('strategyReasoning', '')}"))
+        # Removed old duplicate send_telegram_alert call that was placed here outside db checks
+        pass
 
 
 async def trigger_automated_trade_sim(item: Dict[str, Any], config: Dict[str, Any], force: bool = False):
