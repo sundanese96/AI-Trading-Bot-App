@@ -187,19 +187,34 @@ export function BotLogsTable({
               <div className="flex justify-between items-center border-b border-slate-850 pb-3">
                 <span className="text-slate-400">Ukuran Posisi:</span>
                 <span className="text-slate-200 font-bold">
-                  {selectedTrade.size.toFixed(4)} {(selectedTrade.symbol || selectedTrade.targetAsset || "").replace("USDT", "")}
+                  {(() => {
+                    const coin = (selectedTrade.symbol || selectedTrade.targetAsset || "").toUpperCase().replace("USDT", "");
+                    const isMemeOrLowPrice = ["DOGE", "XRP", "ADA", "SUI", "SHIB"].includes(coin);
+                    return selectedTrade.size.toFixed(isMemeOrLowPrice ? 2 : 4);
+                  })()} {(selectedTrade.symbol || selectedTrade.targetAsset || "").replace("USDT", "")}
                 </span>
               </div>
 
               <div className="flex justify-between items-center border-b border-slate-850 pb-3">
                 <span className="text-slate-400">Harga Masuk (Entry):</span>
-                <span className="text-slate-200 font-bold">${selectedTrade.entryPrice.toLocaleString(undefined, { minimumFractionDigits: 2 })}</span>
+                <span className="text-slate-200 font-bold">
+                  {(() => {
+                    const coin = (selectedTrade.symbol || selectedTrade.targetAsset || "").toUpperCase().replace("USDT", "");
+                    const isLowPrice = ["DOGE", "XRP", "ADA", "SUI", "SHIB"].includes(coin);
+                    return `$${selectedTrade.entryPrice.toLocaleString(undefined, { minimumFractionDigits: isLowPrice ? 4 : 2, maximumFractionDigits: isLowPrice ? 6 : 4 })}`;
+                  })()}
+                </span>
               </div>
 
               <div className="flex justify-between items-center border-b border-slate-850 pb-3">
                 <span className="text-slate-400">Harga Saat Ini:</span>
                 <span className="text-slate-200 font-bold">
-                  ${(botStatus.currentPrices?.[selectedTrade.symbol] || selectedTrade.entryPrice).toLocaleString(undefined, { minimumFractionDigits: 2 })}
+                  {(() => {
+                    const coin = (selectedTrade.symbol || selectedTrade.targetAsset || "").toUpperCase().replace("USDT", "");
+                    const isLowPrice = ["DOGE", "XRP", "ADA", "SUI", "SHIB"].includes(coin);
+                    const livePrice = botStatus.currentPrices?.[selectedTrade.symbol] || selectedTrade.entryPrice;
+                    return `$${livePrice.toLocaleString(undefined, { minimumFractionDigits: isLowPrice ? 4 : 2, maximumFractionDigits: isLowPrice ? 6 : 4 })}`;
+                  })()}
                 </span>
               </div>
 
@@ -228,18 +243,26 @@ export function BotLogsTable({
                   </div>
                 );
               })()}
-
-              <div className="grid grid-cols-2 gap-3 pt-1">
-                <div className="bg-slate-950/20 border border-slate-850 p-2.5 rounded-xl">
-                  <span className="text-slate-500 text-[10px] block">Take Profit (TP)</span>
-                  <span className="text-emerald-400 font-bold text-xs">
-                    {selectedTrade.tp ? `$${selectedTrade.tp.toLocaleString(undefined, { minimumFractionDigits: 2 })}` : "Tidak Diatur"}
+              {/* Take Profit & Stop Loss Cards */}
+              <div className="grid grid-cols-2 gap-4">
+                <div className="bg-slate-950/40 p-3 rounded-xl border border-slate-850 text-center">
+                  <span className="block text-[10px] text-slate-400 mb-1">Take Profit (TP)</span>
+                  <span className="font-bold text-emerald-400">
+                    {(() => {
+                      const coin = (selectedTrade.symbol || selectedTrade.targetAsset || "").toUpperCase().replace("USDT", "");
+                      const isLowPrice = ["DOGE", "XRP", "ADA", "SUI", "SHIB"].includes(coin);
+                      return selectedTrade.tp ? `$${selectedTrade.tp.toLocaleString(undefined, { minimumFractionDigits: isLowPrice ? 4 : 2, maximumFractionDigits: isLowPrice ? 6 : 4 })}` : "Tidak Diatur";
+                    })()}
                   </span>
                 </div>
-                <div className="bg-slate-950/20 border border-slate-850 p-2.5 rounded-xl">
-                  <span className="text-slate-500 text-[10px] block">Stop Loss (SL)</span>
-                  <span className="text-rose-400 font-bold text-xs">
-                    {selectedTrade.sl ? `$${selectedTrade.sl.toLocaleString(undefined, { minimumFractionDigits: 2 })}` : "Tidak Diatur"}
+                <div className="bg-slate-950/40 p-3 rounded-xl border border-slate-850 text-center">
+                  <span className="block text-[10px] text-slate-400 mb-1">Stop Loss (SL)</span>
+                  <span className="font-bold text-rose-400">
+                    {(() => {
+                      const coin = (selectedTrade.symbol || selectedTrade.targetAsset || "").toUpperCase().replace("USDT", "");
+                      const isLowPrice = ["DOGE", "XRP", "ADA", "SUI", "SHIB"].includes(coin);
+                      return selectedTrade.sl ? `$${selectedTrade.sl.toLocaleString(undefined, { minimumFractionDigits: isLowPrice ? 4 : 2, maximumFractionDigits: isLowPrice ? 6 : 4 })}` : "Tidak Diatur";
+                    })()}
                   </span>
                 </div>
               </div>
