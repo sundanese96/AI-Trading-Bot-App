@@ -311,7 +311,12 @@ def predict_meta(
                 meta_features = meta_features.reindex(columns=meta_cols, fill_value=0.0)
                 
     # Predict trade success probability
-    p_win = float(meta_model.predict(meta_features)[0])
+    raw_p_win = meta_model.predict(meta_features)
+    if isinstance(raw_p_win, np.ndarray) or isinstance(raw_p_win, list):
+        p_win = float(raw_p_win[0])
+    else:
+        p_win = float(raw_p_win)
+        
     approved = p_win >= 0.55
     
     return p_win, approved
