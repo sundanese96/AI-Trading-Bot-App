@@ -175,9 +175,36 @@ async def ai_bot_automated_loop():
                             # Adapt trigger_automated_trade_sim to support passing dynamic target symbol override
                             # Let's import the local strategy evaluator directly
                             try:
-                                target_asset, decision, confidence, strategy_val, trade_decision, veto_active, correlation_log = await _evaluate_llm_trade_signal(
-                                    headline, dummy_item, config, temp_settings
-                                )
+                                if strategy.upper() == "SCALPING":
+                                    # SCALPING Strategy: Bypass LLM completely. Run ML prediction directly on active market candles.
+                                    from backend.services.ml.inference import fetch_recent_candles, predict_live_with_gate
+                                    target_asset = sym.replace("USDT", "")
+                                    df_recent = await fetch_recent_candles(target_asset, count=120, interval="5m")
+                                    
+                                    model_type = temp_settings.get("modelType", config.get("mlModelType", "lightgbm"))
+                                    resample_min = temp_settings.get("timeframeMinutes", 5)
+                                    
+                                    ml_pred, ml_conf, is_ood, ood_violations, meta_p_win, meta_approved, meta_evaluated = predict_live_with_gate(
+                                        df_recent, model_type=model_type, resample_minutes=resample_min
+                                    )
+                                    
+                                    # Map ML prediction directly to action decision
+                                    # ml_pred: -1 (SHORT), 1 (LONG), 0 (HOLD)
+                                    decision = "LONG" if ml_pred == 1 else "SHORT" if ml_pred == -1 else "HOLD"
+                                    confidence = int(ml_conf * 100)
+                                    strategy_val = "SCALPING"
+                                    
+                                    trade_decision = {
+                                        "decision": decision,
+                                        "confidence": confidence,
+                                        "strategyReasoning": f"Eksekusi Scalping murni berbasis Technical Machine Learning model {model_type.upper()} (LLM Bypassed)."
+                                    }
+                                    veto_active = False # Scalping bypasses Veto Gate by default behavior
+                                    correlation_log = " | SCALPING ML BYPASS ACTIVE"
+                                else:
+                                    target_asset, decision, confidence, strategy_val, trade_decision, veto_active, correlation_log = await _evaluate_llm_trade_signal(
+                                        headline, dummy_item, config, temp_settings
+                                    )
                                 threshold = temp_settings.get("minConfidence", config.get("confidenceThreshold", 75))
                                 
                                 # Enforce Veto override bypass for multi-asset mapping settings

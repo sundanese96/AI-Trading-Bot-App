@@ -216,7 +216,7 @@ export function AIBotPanel({ savedModels, llmSettings, active }: AIBotPanelProps
               <p className="text-[11px] text-slate-400 leading-normal">
                 {settings.strategy === "HEDGING" && "Mode Lindung Nilai Aktif. Robot akan membuka posisi dua arah untuk memproteksi modal, dan mengabaikan Konfirmator ML (Veto Gate) untuk eksekusi langsung."}
                 {settings.strategy === "AGGRESSIVE" && "Mode Agresif Aktif. Sensitivitas sinyal maksimal, leverage tinggi, dan mengabaikan Konfirmator ML (Veto Gate) untuk eksekusi langsung."}
-                {settings.strategy === "SCALPING" && "Mode Scalping Aktif. Eksekusi cepat pada pergerakan mikro, take profit cepat, dan mengabaikan Konfirmator ML (Veto Gate) untuk eksekusi langsung."}
+                {settings.strategy === "SCALPING" && "Mode Scalping Aktif. Eksekusi cepat pada pergerakan mikro, take profit cepat. Strategi ini MEMBYPASS analisis berita LLM dan langsung dieksekusi murni menggunakan Model Machine Learning (XGBoost/LightGBM/CatBoost) dengan data lilin real-time."}
                 {settings.strategy === "CONSERVATIVE" && "Mode Konservatif Aktif. Robot sangat berhati-hati, mensyaratkan konfirmasi ganda dari Model ML (Veto Gate) sebelum membuka posisi."}
                 {settings.strategy === "SWING" && "Mode Swing Aktif. Mencari tren jangka menengah/panjang dengan target profit lebar, mensyaratkan konfirmasi ganda dari Model ML (Veto Gate) sebelum membuka posisi."}
                 {settings.strategy === "MARTINGALE" && "Mode Martingale Aktif. Melakukan akumulasi bertingkat untuk rata-rata harga masuk, mensyaratkan konfirmasi ganda dari Model ML (Veto Gate) sebelum membuka posisi."}
@@ -229,7 +229,7 @@ export function AIBotPanel({ savedModels, llmSettings, active }: AIBotPanelProps
                 ? "bg-amber-500/10 text-amber-300 border border-amber-500/20"
                 : "bg-emerald-500/10 text-emerald-300 border border-emerald-500/20"
             }`}>
-              {["HEDGING", "AGGRESSIVE", "SCALPING"].includes(settings.strategy) ? "Veto Gate: Bypassed ⚡" : "Veto Gate: Enforced 🛡️"}
+              {settings.strategy === "SCALPING" ? "LLM: Bypassed ⚡" : (["HEDGING", "AGGRESSIVE"].includes(settings.strategy) ? "Veto Gate: Bypassed ⚡" : "Veto Gate: Enforced 🛡️")}
             </span>
           </div>
         </div>

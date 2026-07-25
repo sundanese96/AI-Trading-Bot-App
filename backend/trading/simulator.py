@@ -141,7 +141,33 @@ async def trigger_automated_trade_sim(item: Dict[str, Any], config: Dict[str, An
         
         # Import _evaluate_llm_trade_signal from bot module
         from backend.trading.bot import _evaluate_llm_trade_signal
-        target_asset, decision, confidence, strategy, trade_decision, veto_active, correlation_log = await _evaluate_llm_trade_signal(headline, item, config, bot_settings)
+        
+        # Check if strategy is SCALPING to bypass LLM logic completely
+        if bot_settings.get("strategy", "CONSERVATIVE").upper() == "SCALPING":
+            from backend.services.ml.inference import fetch_recent_candles, predict_live_with_gate
+            target_asset = bot_settings.get("symbol", "BTCUSDT").replace("USDT", "")
+            df_recent = await fetch_recent_candles(target_asset, count=120, interval="5m")
+            
+            model_type = bot_settings.get("modelType", config.get("mlModelType", "lightgbm"))
+            resample_min = bot_settings.get("timeframeMinutes", 5)
+            
+            ml_pred, ml_conf, is_ood, ood_violations, meta_p_win, meta_approved, meta_evaluated = predict_live_with_gate(
+                df_recent, model_type=model_type, resample_minutes=resample_min
+            )
+            
+            decision = "LONG" if ml_pred == 1 else "SHORT" if ml_pred == -1 else "HOLD"
+            confidence = int(ml_conf * 100)
+            strategy = "SCALPING"
+            trade_decision = {
+                "decision": decision,
+                "confidence": confidence,
+                "strategyReasoning": f"Eksekusi Scalping murni berbasis Technical Machine Learning model {model_type.upper()} (LLM Bypassed)."
+            }
+            veto_active = False
+            correlation_log = " | SCALPING ML BYPASS ACTIVE"
+        else:
+            target_asset, decision, confidence, strategy, trade_decision, veto_active, correlation_log = await _evaluate_llm_trade_signal(headline, item, config, bot_settings)
+            
         threshold = bot_settings.get("minConfidence", config.get("confidenceThreshold", 75))
         
         await _execute_simulated_trade(headline, target_asset, decision, confidence, strategy, trade_decision, correlation_log, veto_active, bot_settings, threshold)
