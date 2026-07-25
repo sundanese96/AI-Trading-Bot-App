@@ -270,8 +270,27 @@ def predict_meta(
     """
     # Get primary model prediction
     probs = _get_probabilities(primary_model, model_type, latest_features)
-    pred = probs.argmax(axis=1) - 1
-    conf = probs.max(axis=1)
+    
+    # Determine if model is binary or multiclass
+    is_binary = probs.ndim == 1 or probs.shape[0] == 1 or (probs.ndim == 2 and probs.shape[1] == 1)
+    
+    if is_binary:
+        # Extract scalar prob
+        if isinstance(probs, np.ndarray) or isinstance(probs, list):
+            if probs.ndim == 2:
+                prob_val = float(probs[0, 0])
+            else:
+                prob_val = float(probs[0])
+        else:
+            prob_val = float(probs)
+            
+        pred_bin = int(prob_val >= 0.5)  # 0 or 1
+        pred = np.array([-1 if pred_bin == 0 else 1])
+        conf = np.array([prob_val if pred_bin == 1 else 1.0 - prob_val])
+    else:
+        # Multiclass mode: [-1, 0, 1]
+        pred = probs.argmax(axis=1) - 1
+        conf = probs.max(axis=1)
     
     # If primary predicts NEUTRAL, no trade to evaluate
     if pred[0] == 0:
@@ -279,8 +298,8 @@ def predict_meta(
     
     # Build meta-features
     meta_features = latest_features.copy()
-    meta_features['primary_confidence'] = conf
-    meta_features['primary_pred'] = pred
+    meta_features['primary_confidence'] = conf[0]
+    meta_features['primary_pred'] = pred[0]
     
     # Dynamic feature alignment for meta-model
     if hasattr(meta_model, "feature_name"):
