@@ -190,12 +190,21 @@ def predict_live_with_gate(
         
     # 5. Primary model prediction
     if model_type.lower() == "lightgbm":
-        probs = model.predict(latest_features)[0]
+        raw_pred = model.predict(latest_features)
+        # Handle array/scalar safely
+        if isinstance(raw_pred, np.ndarray) or isinstance(raw_pred, list):
+            probs = raw_pred[0]
+        else:
+            probs = raw_pred
     elif model_type.lower() == "catboost":
         probs = model.predict_proba(latest_features)[0]
     else: # xgboost
         dmatrix = xgb.DMatrix(latest_features)
-        probs = model.predict(dmatrix)[0]
+        raw_pred = model.predict(dmatrix)
+        if isinstance(raw_pred, np.ndarray) or isinstance(raw_pred, list):
+            probs = raw_pred[0]
+        else:
+            probs = raw_pred
     
     # Determine if model was trained in binary or multiclass mode
     # Check model file header or default to binary (V2 standard)
@@ -221,8 +230,18 @@ def predict_live_with_gate(
     
     if is_binary_model:
         # Binary mode: 0=SHORT, 1=LONG
-        pred_bin = int(probs >= 0.5)  # 0 or 1
-        confidence = float(probs) if pred_bin == 1 else float(1 - probs)
+        # If probs is an array/list (multiclass fallback), take argmax, otherwise evaluate as scalar probability
+        if isinstance(probs, np.ndarray) or isinstance(probs, list):
+            # If shape is (2,), it means [P(SHORT), P(LONG)]
+            if len(probs) == 2:
+                prob_val = float(probs[1])
+            else:
+                prob_val = float(probs[0])
+        else:
+            prob_val = float(probs)
+            
+        pred_bin = int(prob_val >= 0.5)  # 0 or 1
+        confidence = float(prob_val) if pred_bin == 1 else float(1.0 - prob_val)
         # Map 0 (SHORT) -> -1, 1 (LONG) -> 1 to align with bot execution expectations
         pred_class = -1 if pred_bin == 0 else 1
     else:
