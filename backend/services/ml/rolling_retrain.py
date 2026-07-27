@@ -13,9 +13,9 @@ from backend.core.logger import logger
 from backend.services.ml.inference import fetch_recent_candles
 from backend.services.ml.model import train_model
 
-SYMBOLS = ["BTC", "ETH", "SOL", "BNB"]
+SYMBOLS = ["BTC", "ETH", "SOL", "BNB", "XRP", "ADA", "SUI", "DOGE"]
 TIMEFRAMES = [5, 15]
-MODEL_TYPES = ["lightgbm", "xgboost"]
+MODEL_TYPES = ["lightgbm", "xgboost", "catboost"]
 
 async def run_rolling_walk_forward_retrain():
     """

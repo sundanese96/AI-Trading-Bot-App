@@ -429,6 +429,11 @@ def train_model(
 def load_model(model_type: str = "xgboost", resample_minutes: Optional[int] = None, symbol: Optional[str] = None) -> Optional[Any]:
     """Loads the trained ML model (XGBoost, LightGBM, or CatBoost) from disk."""
     model_path = get_model_path(model_type, resample_minutes, symbol)
+    
+    # Fallback to BTC model if specific symbol model is missing
+    if not model_path.exists() and symbol and symbol.upper() != "BTC":
+        model_path = get_model_path(model_type, resample_minutes, "BTC")
+        
     if model_type.lower() == "lightgbm":
         if not model_path.exists():
             return None
