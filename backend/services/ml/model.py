@@ -64,8 +64,8 @@ def train_model(
     resample_minutes: Optional[int] = None,
     symbol: Optional[str] = None,
     use_binary_mode: bool = True,
-    tp_multiplier: float = 2.0,
-    sl_multiplier: float = 1.0,
+    tp_multiplier: float = 1.2,
+    sl_multiplier: float = 1.2,
     max_holding: int = 15
 ) -> Dict[str, Any]:
     """
@@ -181,6 +181,10 @@ def train_model(
             sample_weights = sample_weights * regime_multiplier
             print(f"[ML Model] Extremely volatile samples (top 1% ATR > {threshold_val:.4f}) downweighted to 0.1 coefficient.")
             
+        # In binary mode, we must NOT supply duplicate individual sample_weights to the Dataset 
+        # so that scale_pos_weight can balance the loss function natively.
+        final_train_weights = None if use_binary_mode else sample_weights
+            
         model_save_path = get_model_path(model_type, resample_minutes, symbol)
         
         if model_type.lower() == "lightgbm":
@@ -206,7 +210,7 @@ def train_model(
                 params['num_class'] = num_classes
             
             # Create Dataset
-            train_data = lgb.Dataset(X_train, label=y_train_mapped, weight=sample_weights)
+            train_data = lgb.Dataset(X_train, label=y_train_mapped, weight=final_train_weights)
             val_data = lgb.Dataset(X_val, label=y_val_mapped, reference=train_data)
             
             # Train model with early stopping
@@ -247,6 +251,12 @@ def train_model(
             
             # Configure and train model with early stopping
             print(f"[ML Model] Training CatBoost model on {task_type} for {num_rounds} rounds...")
+            
+            # Use absolute temp directory to prevent directory creation errors
+            import tempfile
+            cat_train_dir = os.path.join(tempfile.gettempdir(), "catboost_info")
+            os.makedirs(cat_train_dir, exist_ok=True)
+            
             model = CatBoostClassifier(
                 iterations=num_rounds,
                 learning_rate=0.03,
@@ -256,11 +266,12 @@ def train_model(
                 scale_pos_weight=pos_scale_weight if use_binary_mode else None,
                 random_seed=42,
                 task_type=task_type,
+                train_dir=cat_train_dir,
                 verbose=False
             )
             model.fit(
                 X_train, y_train_mapped,
-                sample_weight=sample_weights,
+                sample_weight=final_train_weights,
                 eval_set=(X_val, y_val_mapped),
                 early_stopping_rounds=15,
                 verbose=False
@@ -300,7 +311,7 @@ def train_model(
                 params['num_class'] = num_classes
             
             # Create DMatrix
-            dtrain = xgb.DMatrix(X_train, label=y_train_mapped, weight=sample_weights)
+            dtrain = xgb.DMatrix(X_train, label=y_train_mapped, weight=final_train_weights)
             dval = xgb.DMatrix(X_val, label=y_val_mapped)
             dtest = xgb.DMatrix(X_test, label=y_test_mapped)
             
