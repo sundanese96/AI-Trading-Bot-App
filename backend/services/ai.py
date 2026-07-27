@@ -68,7 +68,17 @@ async def call_gemini(api_key: str, model: str, system_instruction: str, prompt:
         "systemInstruction": {"parts": [{"text": system_instruction}]},
         "generationConfig": {
             "responseMimeType": "application/json",
-            "temperature": 0.2
+            "responseSchema": {
+                "type": "OBJECT",
+                "properties": {
+                    "targetAsset": {"type": "STRING"},
+                    "decision": {"type": "STRING", "enum": ["LONG", "SHORT", "HOLD"]},
+                    "confidence": {"type": "INTEGER"},
+                    "strategyReasoning": {"type": "STRING"}
+                },
+                "required": ["targetAsset", "decision", "confidence", "strategyReasoning"]
+            },
+            "temperature": 0.1
         }
     }
     client = get_shared_client()

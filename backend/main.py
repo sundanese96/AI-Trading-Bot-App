@@ -45,6 +45,8 @@ async def lifespan(app: FastAPI):
         except Exception as e:
             logger.error(f"[Startup] Failed to sync LLM settings: {e}")
 
+    from backend.services.ml.rolling_retrain import rolling_retrain_background_loop
+    
     # Start background tasks
     global background_tasks
     sim_task = asyncio.create_task(market_simulation_loop())
@@ -54,8 +56,9 @@ async def lifespan(app: FastAPI):
     ai_bot_task = asyncio.create_task(ai_bot_automated_loop())
     monitor_task = asyncio.create_task(monitor_binance_positions_loop())
     sim_monitor_task = asyncio.create_task(monitor_simulated_positions_loop())
+    rolling_retrain_task = asyncio.create_task(rolling_retrain_background_loop(interval_hours=24))
     
-    background_tasks.update([sim_task, prices_task, fng_task, scraper_task, ai_bot_task, monitor_task, sim_monitor_task])
+    background_tasks.update([sim_task, prices_task, fng_task, scraper_task, ai_bot_task, monitor_task, sim_monitor_task, rolling_retrain_task])
     yield
     # Clean up background tasks
     sim_task.cancel()
@@ -65,6 +68,7 @@ async def lifespan(app: FastAPI):
     ai_bot_task.cancel()
     monitor_task.cancel()
     sim_monitor_task.cancel()
+    rolling_retrain_task.cancel()
     try:
         await asyncio.gather(sim_task, prices_task, fng_task, scraper_task, monitor_task, sim_monitor_task, return_exceptions=True)
     except Exception:

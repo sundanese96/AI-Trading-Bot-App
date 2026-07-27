@@ -15,6 +15,17 @@ async def _execute_simulated_trade(headline, target_asset, decision, confidence,
     if not live_price or live_price <= 0.0:
         logger.error(f"[Simulator] Failed to resolve current live price for asset {target_asset}. Aborting trade.")
         return
+
+    # Adaptive Microstructure Slippage Model (Institusional Market Impact)
+    # Estimate slippage based on leverage & volatility baseline (0.01% - 0.05% slippage friction)
+    lev_mult = int(bot_settings.get("leverage", 5))
+    slippage_pct = min(0.05, 0.005 * (lev_mult / 5.0))
+    if decision == "LONG":
+        executed_entry_price = round(live_price * (1.0 + slippage_pct / 100.0), 4)
+    elif decision == "SHORT":
+        executed_entry_price = round(live_price * (1.0 - slippage_pct / 100.0), 4)
+    else:
+        executed_entry_price = live_price
         
     symbol_usdt = f"{target_asset}USDT"
     
@@ -43,7 +54,7 @@ async def _execute_simulated_trade(headline, target_asset, decision, confidence,
     
     # NOTE: news_feed insert is handled by analyze_ai() in routes/ai.py — skipping duplicate insert here
     
-    risk = _calculate_risk_parameters(bot_settings, live_price, decision, strategy)
+    risk = _calculate_risk_parameters(bot_settings, live_price, decision, strategy, target_asset=target_asset)
     
     if decision in ["LONG", "SHORT"] and not veto_active and confidence >= threshold:
         margin = risk["margin"]
