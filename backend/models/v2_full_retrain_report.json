@@ -1,0 +1,391 @@
+{
+  "total_models": 48,
+  "successful": 48,
+  "failed": 0,
+  "results": [
+    {
+      "symbol": "BTC",
+      "timeframe": 5,
+      "model_type": "xgboost",
+      "accuracy": 0.5526315789473685,
+      "f1": 0.4667492132280865,
+      "status": "success"
+    },
+    {
+      "symbol": "BTC",
+      "timeframe": 5,
+      "model_type": "lightgbm",
+      "accuracy": 0.756578947368421,
+      "f1": 0.5174603174603174,
+      "status": "success"
+    },
+    {
+      "symbol": "BTC",
+      "timeframe": 5,
+      "model_type": "catboost",
+      "accuracy": 0.6875,
+      "f1": 0.5477253151671756,
+      "status": "success"
+    },
+    {
+      "symbol": "BTC",
+      "timeframe": 15,
+      "model_type": "xgboost",
+      "accuracy": 0.36363636363636365,
+      "f1": 0.3465688842325825,
+      "status": "success"
+    },
+    {
+      "symbol": "BTC",
+      "timeframe": 15,
+      "model_type": "lightgbm",
+      "accuracy": 0.7171717171717171,
+      "f1": 0.4176470588235294,
+      "status": "success"
+    },
+    {
+      "symbol": "BTC",
+      "timeframe": 15,
+      "model_type": "catboost",
+      "accuracy": 0.35353535353535354,
+      "f1": 0.35188216039279874,
+      "status": "success"
+    },
+    {
+      "symbol": "BTC",
+      "timeframe": 60,
+      "model_type": "xgboost",
+      "accuracy": 0.25,
+      "f1": 0.2,
+      "status": "success"
+    },
+    {
+      "symbol": "BTC",
+      "timeframe": 60,
+      "model_type": "lightgbm",
+      "accuracy": 0.75,
+      "f1": 0.42857142857142855,
+      "status": "success"
+    },
+    {
+      "symbol": "BTC",
+      "timeframe": 60,
+      "model_type": "catboost",
+      "accuracy": 0.3,
+      "f1": 0.27083333333333337,
+      "status": "success"
+    },
+    {
+      "symbol": "BTC",
+      "timeframe": 180,
+      "model_type": "xgboost",
+      "accuracy": 0.0,
+      "f1": 0.0,
+      "status": "success"
+    },
+    {
+      "symbol": "BTC",
+      "timeframe": 180,
+      "model_type": "lightgbm",
+      "accuracy": 1.0,
+      "f1": 1.0,
+      "status": "success"
+    },
+    {
+      "symbol": "BTC",
+      "timeframe": 180,
+      "model_type": "catboost",
+      "accuracy": 0.0,
+      "f1": 0.0,
+      "status": "success"
+    },
+    {
+      "symbol": "ETH",
+      "timeframe": 5,
+      "model_type": "xgboost",
+      "accuracy": 0.5526315789473685,
+      "f1": 0.4667492132280865,
+      "status": "success"
+    },
+    {
+      "symbol": "ETH",
+      "timeframe": 5,
+      "model_type": "lightgbm",
+      "accuracy": 0.756578947368421,
+      "f1": 0.5174603174603174,
+      "status": "success"
+    },
+    {
+      "symbol": "ETH",
+      "timeframe": 5,
+      "model_type": "catboost",
+      "accuracy": 0.6875,
+      "f1": 0.5477253151671756,
+      "status": "success"
+    },
+    {
+      "symbol": "ETH",
+      "timeframe": 15,
+      "model_type": "xgboost",
+      "accuracy": 0.36363636363636365,
+      "f1": 0.3465688842325825,
+      "status": "success"
+    },
+    {
+      "symbol": "ETH",
+      "timeframe": 15,
+      "model_type": "lightgbm",
+      "accuracy": 0.7171717171717171,
+      "f1": 0.4176470588235294,
+      "status": "success"
+    },
+    {
+      "symbol": "ETH",
+      "timeframe": 15,
+      "model_type": "catboost",
+      "accuracy": 0.35353535353535354,
+      "f1": 0.35188216039279874,
+      "status": "success"
+    },
+    {
+      "symbol": "ETH",
+      "timeframe": 60,
+      "model_type": "xgboost",
+      "accuracy": 0.25,
+      "f1": 0.2,
+      "status": "success"
+    },
+    {
+      "symbol": "ETH",
+      "timeframe": 60,
+      "model_type": "lightgbm",
+      "accuracy": 0.75,
+      "f1": 0.42857142857142855,
+      "status": "success"
+    },
+    {
+      "symbol": "ETH",
+      "timeframe": 60,
+      "model_type": "catboost",
+      "accuracy": 0.3,
+      "f1": 0.27083333333333337,
+      "status": "success"
+    },
+    {
+      "symbol": "ETH",
+      "timeframe": 180,
+      "model_type": "xgboost",
+      "accuracy": 0.0,
+      "f1": 0.0,
+      "status": "success"
+    },
+    {
+      "symbol": "ETH",
+      "timeframe": 180,
+      "model_type": "lightgbm",
+      "accuracy": 1.0,
+      "f1": 1.0,
+      "status": "success"
+    },
+    {
+      "symbol": "ETH",
+      "timeframe": 180,
+      "model_type": "catboost",
+      "accuracy": 0.0,
+      "f1": 0.0,
+      "status": "success"
+    },
+    {
+      "symbol": "SOL",
+      "timeframe": 5,
+      "model_type": "xgboost",
+      "accuracy": 0.5526315789473685,
+      "f1": 0.4667492132280865,
+      "status": "success"
+    },
+    {
+      "symbol": "SOL",
+      "timeframe": 5,
+      "model_type": "lightgbm",
+      "accuracy": 0.756578947368421,
+      "f1": 0.5174603174603174,
+      "status": "success"
+    },
+    {
+      "symbol": "SOL",
+      "timeframe": 5,
+      "model_type": "catboost",
+      "accuracy": 0.6875,
+      "f1": 0.5477253151671756,
+      "status": "success"
+    },
+    {
+      "symbol": "SOL",
+      "timeframe": 15,
+      "model_type": "xgboost",
+      "accuracy": 0.36363636363636365,
+      "f1": 0.3465688842325825,
+      "status": "success"
+    },
+    {
+      "symbol": "SOL",
+      "timeframe": 15,
+      "model_type": "lightgbm",
+      "accuracy": 0.7171717171717171,
+      "f1": 0.4176470588235294,
+      "status": "success"
+    },
+    {
+      "symbol": "SOL",
+      "timeframe": 15,
+      "model_type": "catboost",
+      "accuracy": 0.35353535353535354,
+      "f1": 0.35188216039279874,
+      "status": "success"
+    },
+    {
+      "symbol": "SOL",
+      "timeframe": 60,
+      "model_type": "xgboost",
+      "accuracy": 0.25,
+      "f1": 0.2,
+      "status": "success"
+    },
+    {
+      "symbol": "SOL",
+      "timeframe": 60,
+      "model_type": "lightgbm",
+      "accuracy": 0.75,
+      "f1": 0.42857142857142855,
+      "status": "success"
+    },
+    {
+      "symbol": "SOL",
+      "timeframe": 60,
+      "model_type": "catboost",
+      "accuracy": 0.3,
+      "f1": 0.27083333333333337,
+      "status": "success"
+    },
+    {
+      "symbol": "SOL",
+      "timeframe": 180,
+      "model_type": "xgboost",
+      "accuracy": 0.0,
+      "f1": 0.0,
+      "status": "success"
+    },
+    {
+      "symbol": "SOL",
+      "timeframe": 180,
+      "model_type": "lightgbm",
+      "accuracy": 1.0,
+      "f1": 1.0,
+      "status": "success"
+    },
+    {
+      "symbol": "SOL",
+      "timeframe": 180,
+      "model_type": "catboost",
+      "accuracy": 0.0,
+      "f1": 0.0,
+      "status": "success"
+    },
+    {
+      "symbol": "BNB",
+      "timeframe": 5,
+      "model_type": "xgboost",
+      "accuracy": 0.5526315789473685,
+      "f1": 0.4667492132280865,
+      "status": "success"
+    },
+    {
+      "symbol": "BNB",
+      "timeframe": 5,
+      "model_type": "lightgbm",
+      "accuracy": 0.756578947368421,
+      "f1": 0.5174603174603174,
+      "status": "success"
+    },
+    {
+      "symbol": "BNB",
+      "timeframe": 5,
+      "model_type": "catboost",
+      "accuracy": 0.6875,
+      "f1": 0.5477253151671756,
+      "status": "success"
+    },
+    {
+      "symbol": "BNB",
+      "timeframe": 15,
+      "model_type": "xgboost",
+      "accuracy": 0.36363636363636365,
+      "f1": 0.3465688842325825,
+      "status": "success"
+    },
+    {
+      "symbol": "BNB",
+      "timeframe": 15,
+      "model_type": "lightgbm",
+      "accuracy": 0.7171717171717171,
+      "f1": 0.4176470588235294,
+      "status": "success"
+    },
+    {
+      "symbol": "BNB",
+      "timeframe": 15,
+      "model_type": "catboost",
+      "accuracy": 0.35353535353535354,
+      "f1": 0.35188216039279874,
+      "status": "success"
+    },
+    {
+      "symbol": "BNB",
+      "timeframe": 60,
+      "model_type": "xgboost",
+      "accuracy": 0.25,
+      "f1": 0.2,
+      "status": "success"
+    },
+    {
+      "symbol": "BNB",
+      "timeframe": 60,
+      "model_type": "lightgbm",
+      "accuracy": 0.75,
+      "f1": 0.42857142857142855,
+      "status": "success"
+    },
+    {
+      "symbol": "BNB",
+      "timeframe": 60,
+      "model_type": "catboost",
+      "accuracy": 0.3,
+      "f1": 0.27083333333333337,
+      "status": "success"
+    },
+    {
+      "symbol": "BNB",
+      "timeframe": 180,
+      "model_type": "xgboost",
+      "accuracy": 0.0,
+      "f1": 0.0,
+      "status": "success"
+    },
+    {
+      "symbol": "BNB",
+      "timeframe": 180,
+      "model_type": "lightgbm",
+      "accuracy": 1.0,
+      "f1": 1.0,
+      "status": "success"
+    },
+    {
+      "symbol": "BNB",
+      "timeframe": 180,
+      "model_type": "catboost",
+      "accuracy": 0.0,
+      "f1": 0.0,
+      "status": "success"
+    }
+  ]
+}

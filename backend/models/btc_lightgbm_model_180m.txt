@@ -6,24 +6,24 @@ label_index=0
 max_feature_idx=35
 objective=binary sigmoid:1
 feature_names=rsi_14 macd_line macd_signal macd_hist bb_pct_upper bb_pct_lower atr_pct_14 volatility_regime trend_regime_slope adx_14 cmf_20 volume_sma_ratio return_1 return_2 return_3 return_5 ma10_ratio ma30_ratio bb_zscore macd_hist_ratio volume_ratio fft_real fft_imag corr_btc_eth_20 corr_btc_sol_20 corr_btc_eth_100 corr_btc_sol_100 ratio_btc_eth_norm ratio_btc_sol_norm ratio_btc_bnb_norm btc_funding_rate funding_mom_1 funding_mom_3 funding_spread_eth funding_spread_sol funding_spread_bnb
-feature_infos=[23.799735721136855:89.743348687358946] [-85.556907482154202:464.08995235626935] [-34.673138316443072:407.28325415876884] [-94.237945724204081:136.41644630643759] [-0.47729176809105683:1.5996651700611038] [-0.27876650938792713:3.1650225032902437] [0.14884152017339922:0.79377127278094783] [0.041666666666666664:1] [0.024041715630174935:0.30932685933897275] [10.33210181209104:54.969910902861635] [-0.15816388377023455:0.36424165632186289] [0.17907205283582667:3.6986905158167596] [-0.0063492752432520172:0.018279937260261336] [-0.011377341554672071:0.019514887662287261] [-0.014642331668707653:0.018123087913282543] [-0.01246155886698519:0.020062071701371531] [-0.0094486106311324567:0.01737210254201416] [-0.010239965298755864:0.020701888523587158] [-2.8441722826531239:3.0312958066779276] [-0.006431708666143396:0.0012596218750160239] [0.17907205283582667:3.6986905158167596] [-4343.9521296370203:3946.012826689931] [-2777.1452789961472:8316.0485901339489] [0.32724614038376726:0.97023071890684176] [0.41706922728771312:0.95949747755805503] [0:0.91720271106470586] [0:0.87271799910658321] [-2.9332262605757133:0.26315657184380509] none [0:3.4694766290872652] [1.8940000000000002e-05:8.9259999999999996e-05] none none [-2.2130000000000007e-05:4.7999999999999994e-05] [-4.6000000000000007e-05:0.00010357] [-0.00011359:5.2779999999999999e-05]
-tree_sizes=438
+feature_infos=none none none none none none none none none none none none none none none none none none none none none none none none none none none none none none none none none none none none
+tree_sizes=240
 
 Tree=0
-num_leaves=3
+num_leaves=1
 num_cat=0
-split_feature=24 1
-split_gain=31.4426 5.75643
-threshold=0.75497818816302542 197.43346426197243
-decision_type=2 2
-left_child=1 -1
-right_child=-2 -3
-leaf_value=-0.25477763240466317 -0.20037385508512545 -0.2979168239295113
-leaf_weight=5.4140625000000018 8.5078124999999982 5.73046875
-leaf_count=20 28 23
-internal_value=-0.251314 -0.27696
-internal_weight=0 11.1445
-internal_count=71 43
+split_feature=
+split_gain=
+threshold=
+decision_type=
+left_child=
+right_child=
+leaf_value=-0.40546510810816427
+leaf_weight=
+leaf_count=
+internal_value=
+internal_weight=
+internal_count=
 is_linear=0
 shrinkage=1
 
@@ -31,8 +31,6 @@ shrinkage=1
 end of trees
 
 feature_importances:
-macd_line=1
-corr_btc_sol_20=1
 
 parameters:
 [boosting: gbdt]
@@ -129,7 +127,7 @@ parameters:
 [objective_seed: 16083]
 [num_class: 1]
 [is_unbalance: 0]
-[scale_pos_weight: 1.28571]
+[scale_pos_weight: 1.5]
 [sigmoid: 1]
 [boost_from_average: 1]
 [reg_sqrt: 0]
