@@ -72,12 +72,12 @@ async def monitor_simulated_positions_loop():
                                 triggered_close = True
                                 close_reason = "TRAILING_STOP"
                         
-                        # 1. Stop Loss check
-                        if not triggered_close and price_change_pct <= -sl_pct:
+                        # 1. Stop Loss check (ROE / Margin PnL % based)
+                        if not triggered_close and pnl_pct <= -sl_pct:
                             triggered_close = True
                             close_reason = "STOP_LOSS"
-                        # 2. Take Profit check
-                        elif not triggered_close and price_change_pct >= tp_pct:
+                        # 2. Take Profit check (ROE / Margin PnL % based)
+                        elif not triggered_close and pnl_pct >= tp_pct:
                             triggered_close = True
                             close_reason = "TAKE_PROFIT"
                         # 3. Timeout check (Configurable)

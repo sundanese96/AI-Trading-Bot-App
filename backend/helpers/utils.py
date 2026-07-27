@@ -71,8 +71,13 @@ def _calculate_risk_parameters(bot_settings, live_price, decision, strategy):
             "sl_pct_raw": h_sl_pct, "tp_pct_raw": h_tp_pct
         }
     
-    sl_price = live_price * (1 - sl_pct / 100) if decision == "LONG" else live_price * (1 + sl_pct / 100)
-    tp_price = live_price * (1 + tp_pct / 100) if decision == "LONG" else live_price * (1 - tp_pct / 100)
+    # Convert ROE PnL% targets into absolute price levels using leverage
+    # ROE% = PriceChange% * Leverage  =>  PriceChange% = ROE% / Leverage
+    price_sl_pct = sl_pct / float(lev_val)
+    price_tp_pct = tp_pct / float(lev_val)
+    
+    sl_price = live_price * (1 - price_sl_pct / 100) if decision == "LONG" else live_price * (1 + price_sl_pct / 100)
+    tp_price = live_price * (1 + price_tp_pct / 100) if decision == "LONG" else live_price * (1 - price_tp_pct / 100)
     return {"lev": lev_val, "margin": margin, "sl_price": sl_price, "tp_price": tp_price, "sl_pct_raw": sl_pct, "tp_pct_raw": tp_pct}
 
 processed_headlines = set()

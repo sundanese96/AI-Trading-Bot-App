@@ -188,6 +188,21 @@ async def ai_bot_automated_loop():
                                         df_recent, model_type=model_type, resample_minutes=resample_min
                                     )
                                     
+                                    # Quant Filter Integration for Scalping (BREAKOUT_ONLY & EMA Trend Filter)
+                                    veto_mode = temp_settings.get("vetoGateMode", "AUTO").upper()
+                                    if veto_mode == "ON":
+                                        # Calculate EMA 50 & Volatility Expansion ratio for Breakout filter
+                                        close_p = df_recent['close'].iloc[-1]
+                                        ema_50 = df_recent['close'].ewm(span=50, adjust=False).mean().iloc[-1]
+                                        atr_5 = (df_recent['high'].combine(df_recent['close'].shift(1), max) - df_recent['low'].combine(df_recent['close'].shift(1), min)).rolling(5).mean().iloc[-1]
+                                        atr_20 = atr_5 / 5.0
+                                        vol_exp = atr_5 / (atr_20 + 1e-8)
+                                        
+                                        # Breakout Filter: Require Volatility Expansion >= 1.05 and Price aligned with EMA 50
+                                        if vol_exp < 1.05 or (ml_pred == 1 and close_p < ema_50) or (ml_pred == -1 and close_p > ema_50):
+                                            ml_pred = 0 # Force HOLD if Breakout condition is not satisfied when Veto Gate is ON
+                                            logger.info(f"[SCALPING QUANT FILTER] Override {target_asset} decision to HOLD (Breakout/EMA condition not met under Veto ON).")
+                                    
                                     # Map ML prediction directly to action decision
                                     # ml_pred: -1 (SHORT), 1 (LONG), 0 (HOLD)
                                     decision = "LONG" if ml_pred == 1 else "SHORT" if ml_pred == -1 else "HOLD"
