@@ -432,11 +432,11 @@ async def get_ai_bot_status(response: Response):
         activated_at = last_log_time or int(time.time() * 1000)
         bot["activatedAt"] = activated_at
 
-    current_confidence = 75
+    current_confidence = 0
     if logs:
         for log in logs:
             if log.get("action") in ["BUY", "SELL", "HOLD"]:
-                current_confidence = log.get("confidence", 75)
+                current_confidence = log.get("confidence", 0)
                 break
 
     return {
