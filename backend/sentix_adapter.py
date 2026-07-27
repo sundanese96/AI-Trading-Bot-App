@@ -191,9 +191,27 @@ async def close_active_position(trade_id: str, exit_price: float = None) -> Dict
     """
     
     async with sentix_state_lock:
+        # Try exact ID match first
         trade = next((t for t in sentix_state["trades"] if t["id"] == trade_id and t["status"] == "OPEN"), None)
+        
+        # Fallback 1: Match by timestamp/partial ID if direct ID lookup fails
         if not trade:
-            return {"success": False, "message": "Transaksi aktif tidak ditemukan di Sentix."}
+            clean_id_ts = trade_id.replace("trade-bot-buy-", "").replace("trade-bot-sell-", "").replace("trade-long-", "").replace("trade-short-", "").replace("trade-", "")
+            try:
+                target_ts = int(clean_id_ts)
+                trade = next((t for t in sentix_state["trades"] if t["status"] == "OPEN" and abs(t.get("timestamp", 0) - target_ts) < 10000), None)
+            except ValueError:
+                pass
+                
+        # Fallback 2: If trade_id is a symbol string (e.g. BTCUSDT)
+        if not trade and ("USDT" in trade_id.upper() or len(trade_id) <= 8):
+            sym_clean = trade_id.upper()
+            if not sym_clean.endswith("USDT"): sym_clean = f"{sym_clean}USDT"
+            trade = next((t for t in sentix_state["trades"] if t["status"] == "OPEN" and t.get("symbol") == sym_clean), None)
+            
+        if not trade:
+            logger.error(f"[Sentix Adapter] Active trade not found for ID: {trade_id}")
+            return {"success": False, "message": f"Transaksi aktif dengan ID {trade_id} tidak ditemukan di Sentix."}
 
         prices = _get_current_prices()
         live_price = exit_price or prices.get(trade["symbol"], trade["entryPrice"])
