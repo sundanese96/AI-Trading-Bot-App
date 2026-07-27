@@ -163,6 +163,9 @@ async def ai_bot_automated_loop():
                         logger.info(f"[AI Bot Loop] Multi-asset mode active. Scanning symbols: {supported_symbols}")
                         
                         for sym in supported_symbols:
+                            # Add defensive 0.15s delay between symbol scans to prevent hitting Binance API rate limits (HTTP 429)
+                            await asyncio.sleep(0.15)
+                            
                             # Create a localized temporary copy of settings for this specific symbol evaluation
                             temp_settings = dict(bot_settings)
                             temp_settings["symbol"] = sym

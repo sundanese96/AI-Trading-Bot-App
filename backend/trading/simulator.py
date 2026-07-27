@@ -60,9 +60,19 @@ async def _execute_simulated_trade(headline, target_asset, decision, confidence,
         margin = risk["margin"]
         if strategy == "MARTINGALE":
             closed_trades = sorted([t for t in sentix_state.get("trades", []) if t.get("status") == "CLOSED"], key=lambda x: x.get("closeTime", 0) or x.get("exitTimestamp", 0) or 0, reverse=True)
-            if closed_trades and (closed_trades[0].get("pnl", 0.0) or 0.0) < 0.0:
-                margin *= 2.0
-                log_entry["message"] += f" [Martingale Double Active: ${margin}]"
+            # Count consecutive loss streak to calculate capped Martingale scaling
+            loss_streak = 0
+            for t in closed_trades:
+                if (t.get("pnl", 0.0) or 0.0) < 0.0:
+                    loss_streak += 1
+                else:
+                    break
+            
+            # Cap Martingale to max 3 consecutive doubles (max 8x base allocation)
+            capped_streak = min(3, loss_streak)
+            if capped_streak > 0:
+                margin = min(margin * (2 ** capped_streak), risk["margin"] * 4.0)
+                log_entry["message"] += f" [Martingale Capped Double Active ({loss_streak} losses): ${margin:.2f}]"
 
         def add_sentix_trade(trade_type, sl_val, tp_val, active_margin):
             qty = (active_margin * risk["lev"]) / live_price

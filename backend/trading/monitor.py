@@ -52,7 +52,10 @@ async def monitor_simulated_positions_loop():
                             price_change_pct = ((entry_price - cur_price) / entry_price) * 100
                             
                         pnl_pct = price_change_pct * leverage
-                        margin_used = trade.get("margin", entry_price)
+                        
+                        # Fix 4: Correct fallback for margin_used (use allocationPerTrade default instead of entry_price)
+                        base_alloc = float(sentix_state.get("aiBotSettings", {}).get("allocationPerTrade", 1000.0))
+                        margin_used = trade.get("margin") or base_alloc
                         pnl_dollar = (pnl_pct / 100.0) * margin_used
                         trade["pnl"] = round(pnl_dollar, 2)
                         
@@ -61,14 +64,11 @@ async def monitor_simulated_positions_loop():
                         
                         ts_pct = float(sentix_state.get("aiBotSettings", {}).get("trailingStopPct", 0.5))
                         
-                        if decision == "LONG":
-                            trade["highestPrice"] = max(trade.get("highestPrice", cur_price), cur_price)
-                            if ts_pct > 0 and cur_price <= trade["highestPrice"] * (1 - ts_pct / 100):
-                                triggered_close = True
-                                close_reason = "TRAILING_STOP"
-                        else:
-                            trade["lowestPrice"] = min(trade.get("lowestPrice", cur_price), cur_price) if trade.get("lowestPrice") else cur_price
-                            if ts_pct > 0 and cur_price >= trade["lowestPrice"] * (1 + ts_pct / 100):
+                        # Fix 3: ROE-Based Trailing Stop (Calculated from highest/lowest ROE Margin PnL %)
+                        if ts_pct > 0:
+                            trade["highestROE"] = max(trade.get("highestROE", pnl_pct), pnl_pct)
+                            # Trigger trailing stop if ROE drops by ts_pct from peak ROE
+                            if trade["highestROE"] > 0 and (trade["highestROE"] - pnl_pct) >= ts_pct:
                                 triggered_close = True
                                 close_reason = "TRAILING_STOP"
                         
