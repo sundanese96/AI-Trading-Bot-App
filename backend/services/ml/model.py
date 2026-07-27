@@ -161,6 +161,18 @@ def train_model(
         weights = {cls: total_samples / (len(class_counts) * count) for cls, count in class_counts.items()}
         sample_weights = y_train_mapped.map(weights)
         
+        # Calculate scale_pos_weight for binary models (ratio of negative to positive class)
+        # Class 0: SHORT/DOWN, Class 1: LONG/UP
+        pos_scale_weight = 1.0
+        if use_binary_mode:
+            # Cast explicitly to pandas Series to avoid Pyright reporting error on bool
+            y_train_mapped_series = pd.Series(y_train_mapped)
+            n_short = int((y_train_mapped_series == 0).sum())
+            n_long = int((y_train_mapped_series == 1).sum())
+            if n_long > 0:
+                pos_scale_weight = float(n_short) / float(n_long)
+                print(f"[ML Model] Binary scale_pos_weight set to {pos_scale_weight:.4f} (SHORT={n_short}, LONG={n_long}) to balance class weights.")
+        
         # Downweight gradient influence during extreme volatility periods (top 1% highest atr_pct_14)
         if 'atr_pct_14' in X_train.columns:
             threshold_val = np.percentile(X_train['atr_pct_14'].dropna(), 99)
@@ -188,7 +200,9 @@ def train_model(
                 'verbose': -1,
                 'random_state': 42
             }
-            if not use_binary_mode:
+            if use_binary_mode:
+                params['scale_pos_weight'] = pos_scale_weight
+            else:
                 params['num_class'] = num_classes
             
             # Create Dataset
@@ -239,6 +253,7 @@ def train_model(
                 depth=6,
                 loss_function='Logloss' if use_binary_mode else 'MultiClass',
                 eval_metric='Logloss' if use_binary_mode else 'MultiClass',
+                scale_pos_weight=pos_scale_weight if use_binary_mode else None,
                 random_seed=42,
                 task_type=task_type,
                 verbose=False
@@ -279,7 +294,9 @@ def train_model(
                 'colsample_bytree': 0.8,
                 'random_state': 42
             }
-            if not use_binary_mode:
+            if use_binary_mode:
+                params['scale_pos_weight'] = pos_scale_weight
+            else:
                 params['num_class'] = num_classes
             
             # Create DMatrix

@@ -210,7 +210,7 @@ async def ai_bot_automated_loop():
                                 # Enforce Veto override bypass for multi-asset mapping settings
                                 veto_mode = temp_settings.get("vetoGateMode", "AUTO").upper()
                                 if veto_mode == "ON":
-                                    veto_active = veto_active or False
+                                    veto_active = True
                                 elif veto_mode == "OFF":
                                     veto_active = False
                                 

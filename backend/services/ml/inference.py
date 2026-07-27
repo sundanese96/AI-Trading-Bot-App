@@ -220,6 +220,15 @@ def predict_live_with_gate(
     elif isinstance(probs, (list, tuple)) and len(probs) <= 2:
         is_binary_model = True
     
+    # 5.5 Volatility and Noise Filter (Market Sideways Guard)
+    # If the rolling ATR (percentage of price) is under 0.08%, market is dead/sideways.
+    # Force decision to HOLD (0) to avoid getting chopped or trapped in noisy trades.
+    if "atr_pct_14" in latest_features.columns:
+        current_atr = float(latest_features["atr_pct_14"].iloc[-1])
+        if current_atr < 0.08:
+            print(f"[Inference Guard] ATR percentage {current_atr:.4f}% is below minimum 0.08% threshold. Market is too sideways. Forcing HOLD.")
+            return 0, 0.0, is_ood, ood_violations, None, False, False
+
     if is_binary_model:
         # Binary mode: 0=SHORT, 1=LONG
         if isinstance(probs, np.ndarray) or isinstance(probs, list):
