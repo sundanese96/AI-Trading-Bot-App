@@ -189,17 +189,50 @@ def train_model(
         
         if model_type.lower() == "lightgbm":
             import lightgbm as lgb
+            import optuna
+            optuna.logging.set_verbosity(optuna.logging.WARNING)
+            
+            # Optuna HPO tuning for LightGBM
+            print(f"[ML Model Optuna HPO] Tuning LightGBM hyper-parameters for {symbol} ({resample_minutes}m)...")
+            def objective_lgb(trial):
+                hpo_params = {
+                    'objective': 'binary' if use_binary_mode else 'multiclass',
+                    'metric': 'binary_logloss' if use_binary_mode else 'multi_logloss',
+                    'boosting_type': 'gbdt',
+                    'n_estimators': trial.suggest_int('n_estimators', 50, 150),
+                    'learning_rate': trial.suggest_float('learning_rate', 0.01, 0.1, log=True),
+                    'num_leaves': trial.suggest_int('num_leaves', 15, 63),
+                    'max_depth': trial.suggest_int('max_depth', 3, 8),
+                    'subsample': trial.suggest_float('subsample', 0.6, 1.0),
+                    'colsample_bytree': trial.suggest_float('colsample_bytree', 0.6, 1.0),
+                    'verbose': -1,
+                    'random_state': 42
+                }
+                if use_binary_mode:
+                    hpo_params['scale_pos_weight'] = pos_scale_weight
+                else:
+                    hpo_params['num_class'] = num_classes
+                    
+                clf = lgb.LGBMClassifier(**hpo_params)
+                clf.fit(X_train, y_train_mapped, sample_weight=final_train_weights)
+                val_preds = clf.predict(X_val)
+                return (val_preds == y_val_mapped).mean()
+
+            study = optuna.create_study(direction='maximize', sampler=optuna.samplers.TPESampler(seed=42))
+            study.optimize(objective_lgb, n_trials=15)
+            best_tuned_params = study.best_params
+            print(f"[ML Model Optuna HPO] Best LightGBM Parameters: {best_tuned_params}")
             
             # Configure parameters
             params = {
                 'objective': 'binary' if use_binary_mode else 'multiclass',
                 'metric': 'binary_logloss' if use_binary_mode else 'multi_logloss',
                 'boosting_type': 'gbdt',
-                'learning_rate': 0.03,
-                'num_leaves': 31,
-                'max_depth': 6,
-                'feature_fraction': 0.8,
-                'bagging_fraction': 0.8,
+                'learning_rate': best_tuned_params.get('learning_rate', 0.03),
+                'num_leaves': best_tuned_params.get('num_leaves', 31),
+                'max_depth': best_tuned_params.get('max_depth', 6),
+                'feature_fraction': best_tuned_params.get('colsample_bytree', 0.8),
+                'bagging_fraction': best_tuned_params.get('subsample', 0.8),
                 'bagging_freq': 5,
                 'verbose': -1,
                 'random_state': 42
@@ -209,16 +242,18 @@ def train_model(
             else:
                 params['num_class'] = num_classes
             
+            num_rounds_tuned = best_tuned_params.get('n_estimators', num_rounds)
+            
             # Create Dataset
             train_data = lgb.Dataset(X_train, label=y_train_mapped, weight=final_train_weights)
             val_data = lgb.Dataset(X_val, label=y_val_mapped, reference=train_data)
             
             # Train model with early stopping
-            print(f"[ML Model] Training LightGBM model for {num_rounds} rounds...")
+            print(f"[ML Model] Training LightGBM model for {num_rounds_tuned} rounds...")
             gbm = lgb.train(
                 params,
                 train_data,
-                num_boost_round=num_rounds,
+                num_boost_round=num_rounds_tuned,
                 valid_sets=[train_data, val_data],
                 callbacks=[lgb.early_stopping(stopping_rounds=15, verbose=False)]
             )

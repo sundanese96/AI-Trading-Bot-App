@@ -175,8 +175,16 @@ async def trigger_automated_trade_sim(item: Dict[str, Any], config: Dict[str, An
                 "confidence": confidence,
                 "strategyReasoning": f"Eksekusi Scalping murni berbasis Technical Machine Learning model {model_type.upper()} (LLM Bypassed)."
             }
-            veto_active = False
-            correlation_log = " | SCALPING ML BYPASS ACTIVE"
+            veto_mode = bot_settings.get("vetoGateMode", "AUTO").upper()
+            if veto_mode == "ON":
+                veto_active = True
+                correlation_log = " | VETO GATE FORCED ON BY MASTER OVERRIDE"
+            elif veto_mode == "OFF":
+                veto_active = False
+                correlation_log = " | SCALPING ML BYPASS ACTIVE (FORCE OFF)"
+            else: # AUTO: SCALPING bypasses Veto Gate by default behavior for speed
+                veto_active = False
+                correlation_log = " | SCALPING ML BYPASS ACTIVE (AUTO)"
         else:
             target_asset, decision, confidence, strategy, trade_decision, veto_active, correlation_log = await _evaluate_llm_trade_signal(headline, item, config, bot_settings)
             

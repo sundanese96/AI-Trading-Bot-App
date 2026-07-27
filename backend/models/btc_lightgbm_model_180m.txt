@@ -3,10 +3,10 @@ version=v4
 num_class=1
 num_tree_per_iteration=1
 label_index=0
-max_feature_idx=35
+max_feature_idx=38
 objective=binary sigmoid:1
-feature_names=rsi_14 macd_line macd_signal macd_hist bb_pct_upper bb_pct_lower atr_pct_14 volatility_regime trend_regime_slope adx_14 cmf_20 volume_sma_ratio return_1 return_2 return_3 return_5 ma10_ratio ma30_ratio bb_zscore macd_hist_ratio volume_ratio fft_real fft_imag corr_btc_eth_20 corr_btc_sol_20 corr_btc_eth_100 corr_btc_sol_100 ratio_btc_eth_norm ratio_btc_sol_norm ratio_btc_bnb_norm btc_funding_rate funding_mom_1 funding_mom_3 funding_spread_eth funding_spread_sol funding_spread_bnb
-feature_infos=none none none none none none none none none none none none none none none none none none none none none none none none none none none none none none none none none none none none
+feature_names=rsi_14 macd_line macd_signal macd_hist bb_pct_upper bb_pct_lower atr_pct_14 volatility_regime trend_regime_slope adx_14 cmf_20 volume_sma_ratio return_1 return_2 return_3 return_5 ma10_ratio ma30_ratio bb_zscore macd_hist_ratio volume_ratio fft_real fft_imag corr_btc_eth_20 corr_btc_sol_20 corr_btc_eth_100 corr_btc_sol_100 ratio_btc_eth_norm ratio_btc_sol_norm ratio_btc_bnb_norm btc_funding_rate funding_mom_1 funding_mom_3 funding_spread_eth funding_spread_sol funding_spread_bnb ofi_zscore atr_ratio_5_20 rolls_implied_spread
+feature_infos=none none none none none none none none none none none none none none none none none none none none none none none none none none none none none none none none none none none none none none none
 tree_sizes=240
 
 Tree=0
@@ -41,9 +41,9 @@ parameters:
 [data_sample_strategy: bagging]
 [data: ]
 [valid: ]
-[num_iterations: 100]
-[learning_rate: 0.03]
-[num_leaves: 31]
+[num_iterations: 87]
+[learning_rate: 0.0892718]
+[num_leaves: 50]
 [num_threads: 0]
 [seed: 42]
 [deterministic: 0]
@@ -53,12 +53,12 @@ parameters:
 [max_depth: 6]
 [min_data_in_leaf: 20]
 [min_sum_hessian_in_leaf: 0.001]
-[bagging_fraction: 0.8]
+[bagging_fraction: 0.662407]
 [pos_bagging_fraction: 1]
 [neg_bagging_fraction: 1]
 [bagging_freq: 5]
 [bagging_seed: 400]
-[feature_fraction: 0.8]
+[feature_fraction: 0.662398]
 [feature_fraction_bynode: 1]
 [feature_fraction_seed: 30056]
 [extra_trees: 0]

@@ -7,32 +7,32 @@
       "symbol": "BTC",
       "timeframe": 5,
       "model_type": "xgboost",
-      "accuracy": 0.5526315789473685,
-      "f1": 0.4667492132280865,
+      "accuracy": 0.5756578947368421,
+      "f1": 0.4824678323985483,
       "status": "success"
     },
     {
       "symbol": "BTC",
       "timeframe": 5,
       "model_type": "lightgbm",
-      "accuracy": 0.756578947368421,
-      "f1": 0.5174603174603174,
+      "accuracy": 0.8157894736842105,
+      "f1": 0.4492753623188406,
       "status": "success"
     },
     {
       "symbol": "BTC",
       "timeframe": 5,
       "model_type": "catboost",
-      "accuracy": 0.6875,
-      "f1": 0.5477253151671756,
+      "accuracy": 0.6019736842105263,
+      "f1": 0.47160813043165983,
       "status": "success"
     },
     {
       "symbol": "BTC",
       "timeframe": 15,
       "model_type": "xgboost",
-      "accuracy": 0.36363636363636365,
-      "f1": 0.3465688842325825,
+      "accuracy": 0.5050505050505051,
+      "f1": 0.5048484229866286,
       "status": "success"
     },
     {
@@ -47,8 +47,8 @@
       "symbol": "BTC",
       "timeframe": 15,
       "model_type": "catboost",
-      "accuracy": 0.35353535353535354,
-      "f1": 0.35188216039279874,
+      "accuracy": 0.41414141414141414,
+      "f1": 0.40386212624584716,
       "status": "success"
     },
     {
@@ -71,8 +71,8 @@
       "symbol": "BTC",
       "timeframe": 60,
       "model_type": "catboost",
-      "accuracy": 0.3,
-      "f1": 0.27083333333333337,
+      "accuracy": 0.35,
+      "f1": 0.3350383631713555,
       "status": "success"
     },
     {
@@ -103,32 +103,32 @@
       "symbol": "ETH",
       "timeframe": 5,
       "model_type": "xgboost",
-      "accuracy": 0.5526315789473685,
-      "f1": 0.4667492132280865,
+      "accuracy": 0.5756578947368421,
+      "f1": 0.4824678323985483,
       "status": "success"
     },
     {
       "symbol": "ETH",
       "timeframe": 5,
       "model_type": "lightgbm",
-      "accuracy": 0.756578947368421,
-      "f1": 0.5174603174603174,
+      "accuracy": 0.8157894736842105,
+      "f1": 0.4492753623188406,
       "status": "success"
     },
     {
       "symbol": "ETH",
       "timeframe": 5,
       "model_type": "catboost",
-      "accuracy": 0.6875,
-      "f1": 0.5477253151671756,
+      "accuracy": 0.6019736842105263,
+      "f1": 0.47160813043165983,
       "status": "success"
     },
     {
       "symbol": "ETH",
       "timeframe": 15,
       "model_type": "xgboost",
-      "accuracy": 0.36363636363636365,
-      "f1": 0.3465688842325825,
+      "accuracy": 0.5050505050505051,
+      "f1": 0.5048484229866286,
       "status": "success"
     },
     {
@@ -143,8 +143,8 @@
       "symbol": "ETH",
       "timeframe": 15,
       "model_type": "catboost",
-      "accuracy": 0.35353535353535354,
-      "f1": 0.35188216039279874,
+      "accuracy": 0.41414141414141414,
+      "f1": 0.40386212624584716,
       "status": "success"
     },
     {
@@ -167,8 +167,8 @@
       "symbol": "ETH",
       "timeframe": 60,
       "model_type": "catboost",
-      "accuracy": 0.3,
-      "f1": 0.27083333333333337,
+      "accuracy": 0.35,
+      "f1": 0.3350383631713555,
       "status": "success"
     },
     {
@@ -199,32 +199,32 @@
       "symbol": "SOL",
       "timeframe": 5,
       "model_type": "xgboost",
-      "accuracy": 0.5526315789473685,
-      "f1": 0.4667492132280865,
+      "accuracy": 0.5756578947368421,
+      "f1": 0.4824678323985483,
       "status": "success"
     },
     {
       "symbol": "SOL",
       "timeframe": 5,
       "model_type": "lightgbm",
-      "accuracy": 0.756578947368421,
-      "f1": 0.5174603174603174,
+      "accuracy": 0.8157894736842105,
+      "f1": 0.4492753623188406,
       "status": "success"
     },
     {
       "symbol": "SOL",
       "timeframe": 5,
       "model_type": "catboost",
-      "accuracy": 0.6875,
-      "f1": 0.5477253151671756,
+      "accuracy": 0.6019736842105263,
+      "f1": 0.47160813043165983,
       "status": "success"
     },
     {
       "symbol": "SOL",
       "timeframe": 15,
       "model_type": "xgboost",
-      "accuracy": 0.36363636363636365,
-      "f1": 0.3465688842325825,
+      "accuracy": 0.5050505050505051,
+      "f1": 0.5048484229866286,
       "status": "success"
     },
     {
@@ -239,8 +239,8 @@
       "symbol": "SOL",
       "timeframe": 15,
       "model_type": "catboost",
-      "accuracy": 0.35353535353535354,
-      "f1": 0.35188216039279874,
+      "accuracy": 0.41414141414141414,
+      "f1": 0.40386212624584716,
       "status": "success"
     },
     {
@@ -263,8 +263,8 @@
       "symbol": "SOL",
       "timeframe": 60,
       "model_type": "catboost",
-      "accuracy": 0.3,
-      "f1": 0.27083333333333337,
+      "accuracy": 0.35,
+      "f1": 0.3350383631713555,
       "status": "success"
     },
     {
@@ -295,32 +295,32 @@
       "symbol": "BNB",
       "timeframe": 5,
       "model_type": "xgboost",
-      "accuracy": 0.5526315789473685,
-      "f1": 0.4667492132280865,
+      "accuracy": 0.5756578947368421,
+      "f1": 0.4824678323985483,
       "status": "success"
     },
     {
       "symbol": "BNB",
       "timeframe": 5,
       "model_type": "lightgbm",
-      "accuracy": 0.756578947368421,
-      "f1": 0.5174603174603174,
+      "accuracy": 0.8157894736842105,
+      "f1": 0.4492753623188406,
       "status": "success"
     },
     {
       "symbol": "BNB",
       "timeframe": 5,
       "model_type": "catboost",
-      "accuracy": 0.6875,
-      "f1": 0.5477253151671756,
+      "accuracy": 0.6019736842105263,
+      "f1": 0.47160813043165983,
       "status": "success"
     },
     {
       "symbol": "BNB",
       "timeframe": 15,
       "model_type": "xgboost",
-      "accuracy": 0.36363636363636365,
-      "f1": 0.3465688842325825,
+      "accuracy": 0.5050505050505051,
+      "f1": 0.5048484229866286,
       "status": "success"
     },
     {
@@ -335,8 +335,8 @@
       "symbol": "BNB",
       "timeframe": 15,
       "model_type": "catboost",
-      "accuracy": 0.35353535353535354,
-      "f1": 0.35188216039279874,
+      "accuracy": 0.41414141414141414,
+      "f1": 0.40386212624584716,
       "status": "success"
     },
     {
@@ -359,8 +359,8 @@
       "symbol": "BNB",
       "timeframe": 60,
       "model_type": "catboost",
-      "accuracy": 0.3,
-      "f1": 0.27083333333333337,
+      "accuracy": 0.35,
+      "f1": 0.3350383631713555,
       "status": "success"
     },
     {

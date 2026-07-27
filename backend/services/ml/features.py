@@ -382,4 +382,26 @@ def extract_features(df: pd.DataFrame) -> pd.DataFrame:
         features['funding_spread_sol'] = (btc_funding - sol_funding).fillna(0.0).values
         features['funding_spread_bnb'] = (btc_funding - bnb_funding).fillna(0.0).values
         
+    # --- Microstructure Proxy Features ---
+    # 1. Order Flow Imbalance (OFI) Proxy (Cont et al. 2014)
+    range_hl = np.where(df['high'] - df['low'] <= 0, 1e-8, df['high'] - df['low'])
+    buy_pressure = (df['close'] - df['low']) / range_hl - (df['high'] - df['close']) / range_hl
+    ofi_proxy = buy_pressure * df['volume']
+    features['ofi_zscore'] = ((ofi_proxy - ofi_proxy.rolling(20).mean()) / (ofi_proxy.rolling(20).std() + 1e-8)).fillna(0.0).values
+    
+    # 2. ATR Compression / Expansion Ratio
+    hl = df['high'] - df['low']
+    hc = np.abs(df['high'] - df['close'].shift(1))
+    lc = np.abs(df['low'] - df['close'].shift(1))
+    tr = pd.concat([hl, hc, lc], axis=1).max(axis=1)
+    atr_5 = tr.rolling(5).mean()
+    atr_20 = tr.rolling(20).mean()
+    features['atr_ratio_5_20'] = (atr_5 / (atr_20 + 1e-8)).fillna(1.0).values
+    
+    # 3. Roll's Implied Spread Proxy (Roll 1984)
+    price_diff = df['close'].diff()
+    cov = price_diff.rolling(20).cov(price_diff.shift(1))
+    rolls_spread = 2.0 * np.sqrt(np.maximum(0, -cov)) / (df['close'] + 1e-8)
+    features['rolls_implied_spread'] = pd.Series(rolls_spread).fillna(0.0).values
+
     return features
