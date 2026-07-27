@@ -248,27 +248,27 @@ async def ai_bot_automated_loop():
                                                 
                                         if hist_target and hist_btc:
                                             stats = calculate_asset_beta(hist_target, hist_btc)
-                                            r_val = stats["correlation"]
+                                            r_val = stats.get("dcc_correlation", stats["correlation"])
                                             
                                             # Let's inspect BTC's current trend from recent prices
                                             btc_price_trend = "UP" if hist_btc[-1] >= hist_btc[-2] else "DOWN"
                                             
                                             # Filter 1: ALT DIVERGENCE (HEDGE) -> Alt is moving opposite to BTC when BTC goes down
-                                            # (Correlation < 0, and we want to SHORT/LONG differently)
-                                            # Filter 2: ALT MOMENTUM (FOLLOW) -> Alt is highly correlated (> 0.7) and riding the BTC wave
+                                            # (DCC Correlation < 0, and we want to SHORT/LONG differently)
+                                            # Filter 2: ALT MOMENTUM (FOLLOW) -> Alt is highly correlated (DCC > 0.7) and riding the BTC wave
                                             shield_passed = False
                                             shield_reason = ""
                                             
                                             if btc_price_trend == "DOWN" and r_val < 0.0:
                                                 shield_passed = True
-                                                shield_reason = f"BTC Shield: Divergence detected (r={r_val}). Alt is decoupling during BTC drop."
+                                                shield_reason = f"BTC Shield (DCC-GARCH): Divergence detected (r_dcc={r_val}). Alt is decoupling during BTC drop."
                                             elif btc_price_trend == "UP" and r_val > 0.70:
                                                 shield_passed = True
-                                                shield_reason = f"BTC Shield: Strong correlation detected (r={r_val}). Alt is following BTC momentum."
+                                                shield_reason = f"BTC Shield (DCC-GARCH): Strong correlation detected (r_dcc={r_val}). Alt is following BTC momentum."
                                             elif target_asset in ["ETH", "SOL"] and abs(r_val) >= 0.50:
                                                 # High cap exception: Allow moderate correlation
                                                 shield_passed = True
-                                                shield_reason = f"BTC Shield: High-cap correlation match (r={r_val})."
+                                                shield_reason = f"BTC Shield (DCC-GARCH): High-cap correlation match (r_dcc={r_val})."
                                                 
                                             if not shield_passed:
                                                 logger.info(f"[BTC SHIELD] VETO trade on {target_asset}. Correlation {r_val} does not satisfy Shield filters.")

@@ -352,9 +352,38 @@ def calculate_asset_beta(hist_target: List[float], hist_btc: List[float]) -> Dic
     correlation = 0.0
     if std_t > 0 and std_b > 0:
         correlation = cov_tb / (std_t * std_b)
+
+    # DCC-GARCH Dynamic Conditional Correlation Model (Engle 2002)
+    # Estimate GARCH(1,1) conditional variances and dynamic Q_t correlation matrix
+    try:
+        alpha_garch, beta_garch = 0.05, 0.90
+        var_t_garch = var_b # initialize
+        var_b_garch = var_b
+        q_tb = cov_tb
         
+        for i in range(n):
+            res_t = ret_t[i] - mean_t
+            res_b = ret_b[i] - mean_b
+            var_t_garch = (1 - alpha_garch - beta_garch) * std_t**2 + alpha_garch * res_t**2 + beta_garch * var_t_garch
+            var_b_garch = (1 - alpha_garch - beta_garch) * var_b + alpha_garch * res_b**2 + beta_garch * var_b_garch
+            
+            std_t_i = math.sqrt(max(1e-9, var_t_garch))
+            std_b_i = math.sqrt(max(1e-9, var_b_garch))
+            
+            std_res_t = res_t / std_t_i
+            std_res_b = res_b / std_b_i
+            
+            # DCC update: Q_t = (1-a-b)*Q_bar + a*(e_t-1 * e_t-1') + b*Q_t-1
+            q_tb = (1 - 0.03 - 0.95) * cov_tb + 0.03 * (std_res_t * std_res_b) + 0.95 * q_tb
+            
+        dcc_correlation = q_tb / math.sqrt(max(1e-9, (1 + q_tb**2)))
+        dcc_correlation = max(-1.0, min(1.0, dcc_correlation))
+    except Exception:
+        dcc_correlation = correlation
+
     return {
         "correlation": round(correlation, 4),
+        "dcc_correlation": round(dcc_correlation, 4),
         "beta": round(beta, 4),
         "stdDevTarget": round(std_t, 6),
         "stdDevBtc": round(std_b, 6)
