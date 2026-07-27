@@ -8,7 +8,7 @@ import json
 import asyncio
 from typing import Dict, Any, List
 from fastapi import APIRouter, Request, Response
-from backend.config import DB_PATH
+from backend.config import DB_PATH, INSTANCE_SUFFIX
 from backend.database import db_lock, read_database, read_database_async, write_database, write_database_async, load_ai_config, save_ai_config
 
 router = APIRouter()
@@ -41,7 +41,7 @@ sentix_state = {
 
 import threading
 
-SENTIX_DB_FILE = DB_PATH.parent / "db.json"
+SENTIX_DB_FILE = DB_PATH.parent / f"db{INSTANCE_SUFFIX}.json"
 sentix_db_lock = threading.Lock()
 
 def _load_sentix_db():
