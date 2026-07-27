@@ -145,9 +145,9 @@ async def ai_bot_automated_loop():
                             headline = latest_headline
                             source = news_feed[0].get("source", "System Indicator")
                     
-                    current_key = f"{headline}-{symbol}-{strategy}"
-                    # Skip jika berita asli (bukan sideways) sudah dievaluasi sebelumnya (mencegah spam)
-                    if current_key == last_evaluated_key and "sideways" not in headline.lower():
+                    current_key = f"{headline}-{symbol}-{strategy}-{int(now / interval)}"
+                    # Skip jika berita asli (bukan sideways / bukan scalping) sudah dievaluasi sebelumnya (mencegah spam)
+                    if current_key == last_evaluated_key and "sideways" not in headline.lower() and strategy.upper() != "SCALPING":
                         await asyncio.sleep(1)
                         continue
                     

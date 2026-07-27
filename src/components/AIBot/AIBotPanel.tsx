@@ -93,14 +93,15 @@ export function AIBotPanel({ savedModels, llmSettings, active }: AIBotPanelProps
     fetchInitialSettings();
   }, []);
 
-  // Poll status periodically if active
+  // Poll status periodically to keep console fresh (Always poll every 3 seconds)
   useEffect(() => {
     if (!active) return;
+    pollBotStatus();
     const interval = setInterval(() => {
       pollBotStatus();
-    }, (settings.runIntervalSeconds || 10) * 1000);
+    }, 3000);
     return () => clearInterval(interval);
-  }, [active, settings.runIntervalSeconds]);
+  }, [active]);
 
   const startUptimeTimer = () => {
     if (uptimeTimer.current) clearInterval(uptimeTimer.current);
