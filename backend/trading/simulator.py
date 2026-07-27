@@ -185,7 +185,7 @@ async def trigger_automated_trade_sim(item: Dict[str, Any], config: Dict[str, An
             resample_min = bot_settings.get("timeframeMinutes", 5)
             
             ml_pred, ml_conf, is_ood, ood_violations, meta_p_win, meta_approved, meta_evaluated = predict_live_with_gate(
-                df_recent, model_type=model_type, resample_minutes=resample_min
+                df_recent, model_type=model_type, resample_minutes=resample_min, symbol_override=target_asset
             )
             
             decision = "LONG" if ml_pred == 1 else "SHORT" if ml_pred == -1 else "HOLD"

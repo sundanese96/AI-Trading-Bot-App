@@ -188,7 +188,7 @@ async def ai_bot_automated_loop():
                                     resample_min = temp_settings.get("timeframeMinutes", 5)
                                     
                                     ml_pred, ml_conf, is_ood, ood_violations, meta_p_win, meta_approved, meta_evaluated = predict_live_with_gate(
-                                        df_recent, model_type=model_type, resample_minutes=resample_min
+                                        df_recent, model_type=model_type, resample_minutes=resample_min, symbol_override=target_asset
                                     )
                                     
                                     # Quant Filter Integration for Scalping (BREAKOUT_ONLY & EMA Trend Filter)

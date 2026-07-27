@@ -115,7 +115,8 @@ def check_ood_guard(latest_features: pd.DataFrame, resample_minutes: int) -> Tup
 def predict_live_with_gate(
     df_latest: pd.DataFrame,
     model_type: str = "lightgbm",
-    resample_minutes: int = 5
+    resample_minutes: int = 5,
+    symbol_override: Optional[str] = None
 ) -> Tuple[int, float, bool, List[str], Optional[float], bool, bool]:
     """
     Performs feature extraction, checks the OOD Guard boundary, loads the model,
@@ -159,7 +160,12 @@ def predict_live_with_gate(
     is_ood, ood_violations = check_ood_guard(latest_features, resample_minutes)
     
     # Extract target asset name for file prefix matching
-    target_asset = df_latest['symbol'].iloc[-1].upper().replace("USDT", "") if 'symbol' in df_latest.columns else "BTC"
+    if symbol_override:
+        target_asset = symbol_override.upper().replace("USDT", "")
+    elif 'symbol' in df_latest.columns and not df_latest['symbol'].empty:
+        target_asset = str(df_latest['symbol'].iloc[-1]).upper().replace("USDT", "")
+    else:
+        target_asset = "BTC"
     
     # 4. Load Primary Model
     model = load_model(model_type, resample_minutes, target_asset)
