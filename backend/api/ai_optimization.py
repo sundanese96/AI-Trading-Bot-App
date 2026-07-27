@@ -44,28 +44,31 @@ async def optimize_settings_endpoint(request: Request):
             recent_headlines.append(f"- [{n['time']}] {n['headline']} ({n['category']})")
         news_context = "\n".join(recent_headlines)
         
-        # Define LLM instructions
-        system_instruction = """You are a senior quantitative risk manager. Your job is to analyze the bot's current parameter configuration, market conditions, recent news events, and model benchmark test results to recommend optimized trading settings.
-You must return your output ONLY as a valid JSON object matching the exact keys of the input configuration settings. Do not write any preamble, explanation, or markdown block. Return ONLY the JSON object.
+        # Comprehensive system instruction explaining all UI parameters & backend features to the LLM
+        system_instruction = """You are a Lead Quantitative Risk Manager & Algorithmic Trading Systems Director.
+Your task is to analyze the bot's current parameters, market conditions, volatility, news sentiment, and ML benchmark performance to provide optimal parameter recommendations.
 
-Keys to include in output JSON:
-{
-  "leverage": integer (1 to 10),
-  "llmWeight": float (0.0 to 1.0),
-  "mlWeight": float (0.0 to 1.0, must sum to 1.0 with llmWeight),
-  "minConfidence": integer (20 to 90),
-  "stopLossPct": float (0.5 to 3.0),
-  "takeProfitPct": float (1.0 to 8.0),
-  "trailingStopPct": float (0.1 to 2.5),
-  "allocationPerTrade": number (50 to 5000),
-  "sentimentThreshold": float (0.05 to 0.50),
-  "riskLevel": "LOW" or "MEDIUM" or "HIGH",
-  "tpMultiplier": float (0.5 to 2.5),
-  "slMultiplier": float (0.5 to 2.5),
-  "vetoGateMode": "ON" or "OFF" or "AUTO",
-  "modelType": "xgboost" or "lightgbm" or "catboost",
-  "timeframeMinutes": 5 or 15 or 60
-}"""
+You MUST understand the exact backend functionality of each parameter you recommend:
+1. `leverage`: (1 to 10x). Multiplier for margin buying power. High leverage amplifies ROE returns but tightens price liquidation distance.
+2. `llmWeight` & `mlWeight`: (0.0 to 1.0, sum must = 1.0). Fusion weights for hybrid decision making (News Sentiment vs ML Classifiers).
+3. `minConfidence`: (20 to 90%). Minimum fused confidence required before initiating an order. For SCALPING mode, 65-75% is recommended to prevent overtrading.
+4. `stopLossPct`: (0.5 to 3.0%). Target ROE Margin Loss % trigger for auto-closing bad trades.
+5. `takeProfitPct`: (1.0 to 8.0%). Target ROE Margin Profit % trigger for auto-closing winning trades.
+6. `trailingStopPct`: (0.1 to 2.5%). ROE Margin PnL % peak drawdown trigger to lock in gains dynamically.
+7. `allocationPerTrade`: (50 to 5000 USDT). Initial base margin. Automatically scaled by Portfolio Volatility Risk Parity Sizing in backend.
+8. `sentimentThreshold`: (0.05 to 0.50). Absolute sentiment score cutoff for news relevance.
+9. `riskLevel`: ("LOW", "MEDIUM", "HIGH"). Global safety circuit breaker controlling max allowed leverage and tight SL limits.
+10. `tpMultiplier` & `slMultiplier`: (0.5 to 2.5x). Dynamic ATR triple-barrier multipliers for target sizing.
+11. `vetoGateMode`: ("ON", "OFF", "AUTO"). Master Veto Gate setting:
+    - "ON": Forces DCC-GARCH Dynamic Correlation BTC Shield AND Quant Breakout/EMA 50 Filters active on all strategies (Recommended for protection).
+    - "OFF": Forces total bypass of all veto gates.
+    - "AUTO": Bypasses Veto for SCALPING (speed priority), activates Veto for CONSERVATIVE/SWING.
+12. `modelType`: ("xgboost", "lightgbm", "catboost"). Machine Learning Classifier Engine.
+    - "catboost" / "xgboost": Highly recommended for SCALPING (balanced directional predictions across market regimes).
+    - "lightgbm": Fast tree classifier.
+13. `timeframeMinutes`: (5, 15, 60). Candle resolution. For SCALPING, 5m is mandatory.
+
+Return output ONLY as a valid JSON object matching these exact keys. Do not write any markdown code blocks or text explanations outside the JSON."""
         
         # Read the latest V2 benchmark results (Binary mode + Dynamic ATR Triple-Barrier)
         benchmark_results = "N/A"

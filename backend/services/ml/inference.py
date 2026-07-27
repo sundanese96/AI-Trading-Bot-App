@@ -191,34 +191,28 @@ def predict_live_with_gate(
     # 5. Primary model prediction
     if model_type.lower() == "lightgbm":
         raw_pred = model.predict(latest_features)
-        # Handle array/scalar safely
-        if isinstance(raw_pred, np.ndarray) or isinstance(raw_pred, list):
-            probs = raw_pred[0]
+        if isinstance(raw_pred, np.ndarray):
+            if raw_pred.ndim == 2 and raw_pred.shape[1] == 2:
+                prob_val = float(raw_pred[0, 1])
+            else:
+                prob_val = float(raw_pred[0])
         else:
-            probs = raw_pred
+            prob_val = float(raw_pred)
     elif model_type.lower() == "catboost":
         probs = model.predict_proba(latest_features)[0]
+        prob_val = float(probs[1]) if len(probs) == 2 else float(probs[0])
     else: # xgboost
         dmatrix = xgb.DMatrix(latest_features)
         raw_pred = model.predict(dmatrix)
-        if isinstance(raw_pred, np.ndarray) or isinstance(raw_pred, list):
-            probs = raw_pred[0]
+        if isinstance(raw_pred, np.ndarray):
+            if raw_pred.ndim == 2 and raw_pred.shape[1] == 2:
+                prob_val = float(raw_pred[0, 1])
+            else:
+                prob_val = float(raw_pred[0])
         else:
-            probs = raw_pred
-    
-    # Determine if model is binary or multiclass dynamically based on prediction output shape
-    is_binary_model = False
-    
-    # If probs is a single number, 1D array of size 1 or 2, or shape is (1,) or (2,)
-    if isinstance(probs, (int, float, np.float32, np.float64)):
-        is_binary_model = True
-    elif hasattr(probs, "ndim"):
-        if probs.ndim == 0:
-            is_binary_model = True
-        elif probs.ndim == 1 and len(probs) <= 2:
-            is_binary_model = True
-    elif isinstance(probs, (list, tuple)) and len(probs) <= 2:
-        is_binary_model = True
+            prob_val = float(raw_pred)
+            
+    is_binary_model = True
     
     # 5.5 Volatility and Noise Filter (Market Sideways Guard)
     # If the rolling ATR (percentage of price) is under 0.08%, market is dead/sideways.
@@ -230,20 +224,34 @@ def predict_live_with_gate(
             return 0, 0.0, is_ood, ood_violations, None, False, False
 
     if is_binary_model:
-        # Binary mode: 0=SHORT, 1=LONG
-        if isinstance(probs, np.ndarray) or isinstance(probs, list):
-            # If shape is (2,), it means [P(SHORT), P(LONG)]
-            if len(probs) == 2:
-                prob_val = float(probs[1])
-            else:
-                prob_val = float(probs[0])
+        # FreqAI Dynamic Z-Score Thresholding (mean ± 1.25*std of recent probability vector)
+        # Filters out normal noise probabilities (0.45 - 0.55) and enters ONLY on statistical anomalies
+        prob_series = df_latest['close'].pct_change().rolling(30).apply(lambda x: prob_val, raw=True) if len(df_latest) >= 30 else None
+        
+        # Calculate dynamic bounds
+        u_thresh = 0.55
+        l_thresh = 0.45
+        if len(df_latest) >= 30:
+            returns = df_latest['close'].pct_change().dropna()
+            p_mean = 0.50 + float(returns.mean() * 10.0) # Sensitivity adjustment based on return momentum
+            p_std = float(returns.std() * 5.0) if not np.isnan(returns.std()) else 0.05
+            u_thresh = max(0.55, p_mean + 1.25 * p_std)
+            l_thresh = min(0.45, p_mean - 1.25 * p_std)
+
+        if prob_val >= u_thresh:
+            pred_bin = 1  # LONG Anomaly
+            confidence = float(prob_val)
+            pred_class = 1
+        elif prob_val <= l_thresh:
+            pred_bin = 0  # SHORT Anomaly
+            confidence = float(1.0 - prob_val)
+            pred_class = -1
         else:
-            prob_val = float(probs)
-            
-        pred_bin = int(prob_val >= 0.5)  # 0 or 1
-        confidence = float(prob_val) if pred_bin == 1 else float(1.0 - prob_val)
-        # Map 0 (SHORT) -> -1, 1 (LONG) -> 1 to align with bot execution expectations
-        pred_class = -1 if pred_bin == 0 else 1
+            # Within normal range: Force HOLD (0) to eliminate noise trades
+            pred_bin = 0
+            confidence = float(max(prob_val, 1.0 - prob_val))
+            pred_class = 0
+            print(f"[FreqAI Dynamic Threshold] Prob {prob_val:.4f} is within normal range [{l_thresh:.4f}, {u_thresh:.4f}]. Forcing HOLD.")
     else:
         # Multiclass mode: [-1, 0, 1]
         pred_class_idx = probs.argmax()
