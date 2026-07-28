@@ -88,6 +88,7 @@ export default function App() {
   const [isLoadingNews, setIsLoadingNews] = useState(false);
   const [confirmReset, setConfirmReset] = useState(false);
   const [confirmLogout, setConfirmLogout] = useState(false);
+  const [selectedHistoryTrade, setSelectedHistoryTrade] = useState<any | null>(null);
 
   // Check session status on mount and intercept fetch requests for 401 redirection
   useEffect(() => {
@@ -748,19 +749,24 @@ export default function App() {
                 {completedTrades.length === 0 ? (
                   <p className="text-xs text-slate-500 font-mono text-center py-6">Belum ada riwayat perdagangan virtual.</p>
                 ) : (
-                  <div className="space-y-3 max-h-56 overflow-y-auto pr-1">
-                    {completedTrades.slice(0, 10).map((hist) => {
+                  <div className="space-y-3 max-h-[500px] overflow-y-auto pr-1">
+                    {completedTrades.map((hist) => {
                       const isGain = (hist.pnl || 0) >= 0;
                       return (
-                        <div key={hist.id} className="bg-slate-950/50 border border-slate-850 p-3 rounded-xl flex justify-between items-center text-[10px] font-mono">
+                        <div 
+                          key={hist.id} 
+                          onClick={() => setSelectedHistoryTrade(hist)}
+                          title="Klik untuk detail riwayat posisi"
+                          className="bg-slate-950/50 border border-slate-850 hover:border-slate-700 p-3 rounded-xl flex justify-between items-center text-[10px] font-mono cursor-pointer transition"
+                        >
                           <div>
                             <div className="flex items-center gap-1.5">
                               <span className="font-sans font-bold text-slate-300">{hist.symbol.replace("USDT", "")}</span>
-                              <span className={`px-1 rounded text-[8px] font-extrabold ${hist.type === "BUY" ? "text-emerald-400 bg-emerald-500/10" : "text-red-400 bg-red-500/10"}`}>
-                                {hist.type === "BUY" ? "LONG" : "SHORT"}
+                              <span className={`px-1 rounded text-[8px] font-extrabold ${String(hist.type) === "BUY" || String(hist.type) === "LONG" ? "text-emerald-400 bg-emerald-500/10" : "text-red-400 bg-red-500/10"}`}>
+                                {String(hist.type) === "BUY" || String(hist.type) === "LONG" ? "LONG" : "SHORT"}
                               </span>
                             </div>
-                            <p className="text-slate-500 mt-0.5">Keluar: {hist.reason || "MANUAL"}</p>
+                            <p className="text-slate-500 mt-0.5">Keluar: {(hist as any).reason || (hist as any).closeReason || "MANUAL"}</p>
                           </div>
                           <div className="text-right">
                             <p className={`font-bold ${isGain ? "text-emerald-400" : "text-red-400"}`}>
@@ -846,6 +852,69 @@ export default function App() {
           )}
         </ErrorBoundary>
       </main>
+
+      {/* History Trade Detail Modal Popup */}
+      {selectedHistoryTrade && (
+        <div 
+          className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/80 backdrop-blur-sm p-4 animate-fadeIn" 
+          onClick={() => setSelectedHistoryTrade(null)}
+        >
+          <div 
+            className="bg-slate-900 border border-slate-800 rounded-2xl max-w-md w-full p-6 shadow-2xl space-y-5 text-mono text-xs" 
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex justify-between items-center border-b border-slate-800 pb-3">
+              <div className="flex items-center gap-2">
+                <span className={`px-2 py-0.5 rounded text-[10px] font-extrabold ${selectedHistoryTrade.type === "BUY" || selectedHistoryTrade.type === "LONG" ? "bg-emerald-500/10 text-emerald-400" : "bg-rose-500/10 text-rose-400"}`}>
+                  {selectedHistoryTrade.type === "BUY" || selectedHistoryTrade.type === "LONG" ? "LONG (BUY)" : "SHORT (SELL)"}
+                </span>
+                <span className="text-white font-bold text-sm font-sans">
+                  {(selectedHistoryTrade.symbol || selectedHistoryTrade.targetAsset || "").replace("USDT", "")} / USDT
+                </span>
+              </div>
+              <button 
+                onClick={() => setSelectedHistoryTrade(null)}
+                className="text-slate-500 hover:text-white transition p-1 cursor-pointer"
+              >
+                ✕
+              </button>
+            </div>
+
+            <div className="grid grid-cols-2 gap-3 text-[11px] font-mono">
+              <div className="bg-slate-950/50 p-2.5 rounded-xl border border-slate-850">
+                <p className="text-slate-500 text-[9px] uppercase">Harga Entry</p>
+                <p className="text-white font-bold mt-0.5">${selectedHistoryTrade.entryPrice?.toLocaleString()}</p>
+              </div>
+
+              <div className="bg-slate-950/50 p-2.5 rounded-xl border border-slate-850">
+                <p className="text-slate-500 text-[9px] uppercase">Harga Exit</p>
+                <p className="text-slate-200 font-bold mt-0.5">${selectedHistoryTrade.exitPrice ? selectedHistoryTrade.exitPrice.toLocaleString() : "-"}</p>
+              </div>
+
+              <div className="bg-slate-950/50 p-2.5 rounded-xl border border-slate-850">
+                <p className="text-slate-500 text-[9px] uppercase">Leverage</p>
+                <p className="text-slate-200 font-bold mt-0.5">{selectedHistoryTrade.leverage || 5}x</p>
+              </div>
+
+              <div className="bg-slate-950/50 p-2.5 rounded-xl border border-slate-850">
+                <p className="text-slate-500 text-[9px] uppercase">Alasan Penutupan</p>
+                <p className="text-indigo-400 font-bold mt-0.5">{selectedHistoryTrade.reason || selectedHistoryTrade.closeReason || "MANUAL"}</p>
+              </div>
+            </div>
+
+            <div className="bg-slate-950/80 p-3 rounded-xl border border-slate-850 flex justify-between items-center">
+              <span className="text-slate-400 font-bold">Hasil Net PnL (USD):</span>
+              <span className={`text-base font-bold font-mono ${(selectedHistoryTrade.pnl || 0) >= 0 ? "text-emerald-400" : "text-rose-400"}`}>
+                {(selectedHistoryTrade.pnl || 0) >= 0 ? "+" : ""}${selectedHistoryTrade.pnl?.toFixed(2)}
+              </span>
+            </div>
+
+            <div className="text-[9px] text-slate-500 font-mono text-center">
+              Waktu Transaksi Ditutup: {new Date(selectedHistoryTrade.exitTimestamp || selectedHistoryTrade.timestamp || Date.now()).toLocaleString("id-ID")}
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
